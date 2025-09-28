@@ -1,0 +1,9 @@
+{
+  "platforms": ["apple", "android", "web"],
+  "apple": {
+    "modules": ["ReactNativeLive2dModule"]
+  },
+  "android": {
+    "modules": ["expo.modules.live2d.ReactNativeLive2dModule"]
+  }
+}
