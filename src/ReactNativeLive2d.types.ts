@@ -1,3 +1,5 @@
+import { ViewStyle, StyleProp } from 'react-native';
+
 export interface Live2DViewProps {
   /**
    * Live2D 模型文件路径 (相对于 assets 目录)
@@ -46,6 +48,16 @@ export interface Live2DViewProps {
    * @default 0
    */
   offsetY?: number;
+  
+  /**
+   * 视图样式
+   */
+  style?: StyleProp<ViewStyle>;
+  
+  /**
+   * 触摸结束事件
+   */
+  onTouchEnd?: () => void;
   
   /**
    * 点击事件回调

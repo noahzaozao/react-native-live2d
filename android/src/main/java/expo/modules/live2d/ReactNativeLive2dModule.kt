@@ -19,15 +19,38 @@ class ReactNativeLive2dModule : Module() {
   override fun definition() = ModuleDefinition {
     Name("ReactNativeLive2d")
 
+    View(ReactNativeLive2dView::class) {
+      Name("ReactNativeLive2dView")
+      
+      Prop("modelPath") { view: ReactNativeLive2dView, path: String -> 
+        view.loadModel(path) 
+      }
+      
+      Prop("motionGroup") { view: ReactNativeLive2dView, group: String ->
+        // 默认播放第一个动作
+        view.startMotion(group, 0)
+      }
+      
+      Prop("expression") { view: ReactNativeLive2dView, expression: String ->
+        view.setExpression(expression)
+      }
+    }
+
     AsyncFunction("preloadModel") { modelPath: String, promise: Promise ->
       try {
         Log.d(TAG, "Preloading model: $modelPath")
         
-        // 检查模型文件是否存在
-        val inputStream = context.assets.open(modelPath)
+        // 检查模型文件是否存在 - 支持从 public 目录加载
+        val assetPath = if (modelPath.startsWith("public/")) {
+          modelPath.substring(7) // 移除 "public/" 前缀
+        } else {
+          modelPath
+        }
+        
+        val inputStream = context.assets.open(assetPath)
         inputStream.close()
         
-        Log.d(TAG, "Model preloaded successfully: $modelPath")
+        Log.d(TAG, "Model preloaded successfully: $assetPath")
         promise.resolve(null)
         
       } catch (e: IOException) {
