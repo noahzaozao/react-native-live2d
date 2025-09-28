@@ -1,12 +1,22 @@
-import { NativeModule, requireNativeModule } from 'expo';
+import { NativeModules, Platform } from 'react-native';
+import { Live2DModule } from './ReactNativeLive2d.types';
 
-import { ReactNativeLive2dModuleEvents } from './ReactNativeLive2d.types';
+const LINKING_ERROR =
+  `The package 'react-native-live2d' doesn't seem to be linked. Make sure: \n\n` +
+  Platform.select({ ios: "- You have run 'cd ios && pod install'\n", default: '' }) +
+  '- You rebuilt the app after installing the package\n' +
+  '- You are not using Expo managed workflow\n';
 
-declare class ReactNativeLive2dModule extends NativeModule<ReactNativeLive2dModuleEvents> {
-  PI: number;
-  hello(): string;
-  setValueAsync(value: string): Promise<void>;
-}
+const ReactNativeLive2dModule = NativeModules.ReactNativeLive2dModule
+  ? NativeModules.ReactNativeLive2dModule
+  : new Proxy(
+      {},
+      {
+        get() {
+          throw new Error(LINKING_ERROR);
+        },
+      }
+    );
 
-// This call loads the native module object from the JSI.
-export default requireNativeModule<ReactNativeLive2dModule>('ReactNativeLive2d');
+export default ReactNativeLive2dModule as Live2DModule;
+export { ReactNativeLive2dModule };

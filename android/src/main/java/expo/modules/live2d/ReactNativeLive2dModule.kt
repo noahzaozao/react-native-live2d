@@ -2,49 +2,78 @@ package expo.modules.live2d
 
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
-import java.net.URL
+import expo.modules.kotlin.Promise
+import android.content.Context
+import android.util.Log
+import java.io.IOException
 
 class ReactNativeLive2dModule : Module() {
-  // Each module class must implement the definition function. The definition consists of components
-  // that describes the module's functionality and behavior.
-  // See https://docs.expo.dev/modules/module-api for more details about available components.
+  private val context: Context by lazy { 
+    appContext.reactContext ?: throw Exception("React context not available") 
+  }
+  
+  companion object {
+    private const val TAG = "ReactNativeLive2dModule"
+  }
+
   override fun definition() = ModuleDefinition {
-    // Sets the name of the module that JavaScript code will use to refer to the module. Takes a string as an argument.
-    // Can be inferred from module's class name, but it's recommended to set it explicitly for clarity.
-    // The module will be accessible from `requireNativeModule('ReactNativeLive2d')` in JavaScript.
     Name("ReactNativeLive2d")
 
-    // Defines constant property on the module.
-    Constant("PI") {
-      Math.PI
-    }
-
-    // Defines event names that the module can send to JavaScript.
-    Events("onChange")
-
-    // Defines a JavaScript synchronous function that runs the native code on the JavaScript thread.
-    Function("hello") {
-      "Hello world! 👋"
-    }
-
-    // Defines a JavaScript function that always returns a Promise and whose native code
-    // is by default dispatched on the different thread than the JavaScript runtime runs on.
-    AsyncFunction("setValueAsync") { value: String ->
-      // Send an event to JavaScript.
-      sendEvent("onChange", mapOf(
-        "value" to value
-      ))
-    }
-
-    // Enables the module to be used as a native view. Definition components that are accepted as part of
-    // the view definition: Prop, Events.
-    View(ReactNativeLive2dView::class) {
-      // Defines a setter for the `url` prop.
-      Prop("url") { view: ReactNativeLive2dView, url: URL ->
-        view.webView.loadUrl(url.toString())
+    AsyncFunction("preloadModel") { modelPath: String, promise: Promise ->
+      try {
+        Log.d(TAG, "Preloading model: $modelPath")
+        
+        // 检查模型文件是否存在
+        val inputStream = context.assets.open(modelPath)
+        inputStream.close()
+        
+        Log.d(TAG, "Model preloaded successfully: $modelPath")
+        promise.resolve(null)
+        
+      } catch (e: IOException) {
+        Log.e(TAG, "Failed to preload model: ${e.message}")
+        promise.reject("MODEL_LOAD_ERROR", "Failed to preload model: ${e.message}", e)
       }
-      // Defines an event that the view can send to JavaScript.
-      Events("onLoad")
+    }
+
+    AsyncFunction("releaseModel") { modelPath: String, promise: Promise ->
+      try {
+        Log.d(TAG, "Releasing model: $modelPath")
+        // TODO: 实现模型资源释放
+        promise.resolve(null)
+        
+      } catch (e: Exception) {
+        Log.e(TAG, "Failed to release model: ${e.message}")
+        promise.reject("MODEL_RELEASE_ERROR", "Failed to release model: ${e.message}", e)
+      }
+    }
+
+    AsyncFunction("getAvailableMotions") { modelPath: String, promise: Promise ->
+      try {
+        Log.d(TAG, "Getting available motions for: $modelPath")
+        
+        // TODO: 解析模型文件，获取可用动作列表
+        val motions = listOf("idle", "tap", "shake")
+        promise.resolve(motions)
+        
+      } catch (e: Exception) {
+        Log.e(TAG, "Failed to get motions: ${e.message}")
+        promise.reject("MOTIONS_ERROR", "Failed to get motions: ${e.message}", e)
+      }
+    }
+
+    AsyncFunction("getAvailableExpressions") { modelPath: String, promise: Promise ->
+      try {
+        Log.d(TAG, "Getting available expressions for: $modelPath")
+        
+        // TODO: 解析模型文件，获取可用表情列表
+        val expressions = listOf("f01", "f02", "f03")
+        promise.resolve(expressions)
+        
+      } catch (e: Exception) {
+        Log.e(TAG, "Failed to get expressions: ${e.message}")
+        promise.reject("EXPRESSIONS_ERROR", "Failed to get expressions: ${e.message}", e)
+      }
     }
   }
 }

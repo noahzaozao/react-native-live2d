@@ -1,30 +1,62 @@
 package expo.modules.live2d
 
 import android.content.Context
-import android.webkit.WebView
-import android.webkit.WebViewClient
-import expo.modules.kotlin.AppContext
-import expo.modules.kotlin.viewevent.EventDispatcher
-import expo.modules.kotlin.views.ExpoView
+import android.util.Log
+import android.view.View
+import android.widget.TextView
+import expo.modules.kotlin.views.ViewManagerDefinition
 
-class ReactNativeLive2dView(context: Context, appContext: AppContext) : ExpoView(context, appContext) {
-  // Creates and initializes an event dispatcher for the `onLoad` event.
-  // The name of the event is inferred from the value and needs to match the event name defined in the module.
-  private val onLoad by EventDispatcher()
-
-  // Defines a WebView that will be used as the root subview.
-  internal val webView = WebView(context).apply {
-    layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
-    webViewClient = object : WebViewClient() {
-      override fun onPageFinished(view: WebView, url: String) {
-        // Sends an event to JavaScript. Triggers a callback defined on the view component in JavaScript.
-        onLoad(mapOf("url" to url))
-      }
-    }
+class ReactNativeLive2DView(context: Context) : TextView(context) {
+  private var modelPath: String? = null
+  
+  init {
+    // 设置基本属性
+    text = "Live2D View\n(模型加载中...)"
+    textSize = 16f
+    textAlignment = View.TEXT_ALIGNMENT_CENTER
+    setPadding(20, 20, 20, 20)
   }
 
-  init {
-    // Adds the WebView to the view hierarchy.
-    addView(webView)
+  fun loadModel(assetPath: String) {
+    Log.d("ReactNativeLive2D", "Loading model: $assetPath")
+    modelPath = assetPath
+    text = "Live2D View\n模型: $assetPath\n(需要集成 Cubism SDK)"
+  }
+  
+  fun startMotion(motionGroup: String, motionIndex: Int) {
+    Log.d("ReactNativeLive2D", "Starting motion: $motionGroup[$motionIndex]")
+    text = "Live2D View\n动作: $motionGroup[$motionIndex]\n(需要集成 Cubism SDK)"
+  }
+  
+  fun setExpression(expressionId: String) {
+    Log.d("ReactNativeLive2D", "Setting expression: $expressionId")
+    text = "Live2D View\n表情: $expressionId\n(需要集成 Cubism SDK)"
+  }
+  
+  fun update() {
+    // TODO: 更新模型状态
+  }
+}
+
+// ViewManager
+class ReactNativeLive2DViewManager :
+        expo.modules.kotlin.views.ViewManager<ReactNativeLive2DView>() {
+  override fun getName() = "ReactNativeLive2DView"
+
+  override fun createViewInstance(context: Context): ReactNativeLive2DView {
+    return ReactNativeLive2DView(context)
+  }
+
+  override fun definition() = ViewManagerDefinition {
+    prop("modelPath") { view: ReactNativeLive2DView, path: String -> 
+      view.loadModel(path) 
+    }
+    prop("motionGroup") { view: ReactNativeLive2DView, group: String ->
+      // 默认播放第一个动作
+      view.startMotion(group, 0)
+    }
+    prop("expression") { view: ReactNativeLive2DView, expression: String ->
+      view.setExpression(expression)
+    }
   }
 }

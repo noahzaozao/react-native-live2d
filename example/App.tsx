@@ -1,73 +1,176 @@
-import { useEvent } from 'expo';
-import ReactNativeLive2d, { ReactNativeLive2dView } from 'react-native-live2d';
-import { Button, SafeAreaView, ScrollView, Text, View } from 'react-native';
+import React, { useState } from 'react';
+import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import ReactNativeLive2dModule from '../src/ReactNativeLive2dModule';
+import ReactNativeLive2dView from '../src/ReactNativeLive2dView';
 
 export default function App() {
-  const onChangePayload = useEvent(ReactNativeLive2d, 'onChange');
+  const [currentMotion, setCurrentMotion] = useState('idle');
+  const [currentExpression, setCurrentExpression] = useState('f01');
+  
+  const motions = ['idle', 'tap', 'shake'];
+  const expressions = ['f01', 'f02', 'f03'];
+
+  const handleModelLoaded = () => {
+    Alert.alert('成功', 'Live2D 模型加载完成！');
+  };
+
+  const handleError = (error: string) => {
+    Alert.alert('错误', error);
+  };
+
+  const handleTap = () => {
+    // 随机播放一个动作
+    const randomMotion = motions[Math.floor(Math.random() * motions.length)];
+    setCurrentMotion(randomMotion);
+  };
+
+  const changeExpression = (expression: string) => {
+    setCurrentExpression(expression);
+  };
+
+  const preloadModel = async () => {
+    try {
+      await ReactNativeLive2dModule.preloadModel('models/Haru/Haru.model3.json');
+      Alert.alert('成功', '模型预加载完成！');
+    } catch (error) {
+      Alert.alert('错误', `预加载失败: ${error}`);
+    }
+  };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.container}>
-        <Text style={styles.header}>Module API Example</Text>
-        <Group name="Constants">
-          <Text>{ReactNativeLive2d.PI}</Text>
-        </Group>
-        <Group name="Functions">
-          <Text>{ReactNativeLive2d.hello()}</Text>
-        </Group>
-        <Group name="Async functions">
-          <Button
-            title="Set value"
-            onPress={async () => {
-              await ReactNativeLive2d.setValueAsync('Hello from JS!');
-            }}
-          />
-        </Group>
-        <Group name="Events">
-          <Text>{onChangePayload?.value}</Text>
-        </Group>
-        <Group name="Views">
-          <ReactNativeLive2dView
-            url="https://www.example.com"
-            onLoad={({ nativeEvent: { url } }) => console.log(`Loaded: ${url}`)}
-            style={styles.view}
-          />
-        </Group>
-      </ScrollView>
-    </SafeAreaView>
-  );
-}
+    <View style={styles.container}>
+      <Text style={styles.title}>Live2D 示例</Text>
+      
+      <View style={styles.live2dContainer}>
+        <ReactNativeLive2dView
+          modelPath="models/Haru/Haru.model3.json"
+          motionGroup={currentMotion}
+          expression={currentExpression}
+          autoBreath={true}
+          autoBlink={true}
+          scale={1.0}
+          onModelLoaded={handleModelLoaded}
+          onError={handleError}
+          onTap={handleTap}
+        />
+      </View>
 
-function Group(props: { name: string; children: React.ReactNode }) {
-  return (
-    <View style={styles.group}>
-      <Text style={styles.groupHeader}>{props.name}</Text>
-      {props.children}
+      <View style={styles.controls}>
+        <Text style={styles.controlTitle}>动作控制</Text>
+        <View style={styles.buttonRow}>
+          {motions.map((motion) => (
+            <TouchableOpacity
+              key={motion}
+              style={[
+                styles.button,
+                currentMotion === motion && styles.activeButton
+              ]}
+              onPress={() => setCurrentMotion(motion)}
+            >
+              <Text style={styles.buttonText}>{motion}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <Text style={styles.controlTitle}>表情控制</Text>
+        <View style={styles.buttonRow}>
+          {expressions.map((expression) => (
+            <TouchableOpacity
+              key={expression}
+              style={[
+                styles.button,
+                currentExpression === expression && styles.activeButton
+              ]}
+              onPress={() => changeExpression(expression)}
+            >
+              <Text style={styles.buttonText}>{expression}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <TouchableOpacity style={styles.preloadButton} onPress={preloadModel}>
+          <Text style={styles.preloadButtonText}>预加载模型</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
 
-const styles = {
-  header: {
-    fontSize: 30,
-    margin: 20,
-  },
-  groupHeader: {
-    fontSize: 20,
-    marginBottom: 20,
-  },
-  group: {
-    margin: 20,
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 20,
-  },
+const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#eee',
+    backgroundColor: '#f0f0f0',
+    padding: 20,
   },
-  view: {
-    flex: 1,
-    height: 200,
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 20,
+    color: '#333',
   },
-};
+  live2dContainer: {
+    height: 300,
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  controls: {
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    padding: 15,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  controlTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    color: '#333',
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginBottom: 15,
+  },
+  button: {
+    backgroundColor: '#e0e0e0',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 5,
+    marginRight: 8,
+    marginBottom: 8,
+  },
+  activeButton: {
+    backgroundColor: '#007AFF',
+  },
+  buttonText: {
+    color: '#333',
+    fontSize: 12,
+  },
+  preloadButton: {
+    backgroundColor: '#34C759',
+    paddingVertical: 12,
+    borderRadius: 5,
+    alignItems: 'center',
+  },
+  preloadButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+});
