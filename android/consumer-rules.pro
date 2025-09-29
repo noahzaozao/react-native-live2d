@@ -1,0 +1,3 @@
+-keep class com.live2d.** { *; }
+-keep class jp.live2d.** { *; }
+-keepclasseswithmembernames class * { native <methods>; }

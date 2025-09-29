@@ -36,6 +36,7 @@ android {
   defaultConfig {
     versionCode 1
     versionName "0.1.0"
+    consumerProguardFiles 'consumer-rules.pro'
   }
   lintOptions {
     abortOnError false
@@ -46,6 +47,15 @@ android {
   }
   kotlinOptions {
     jvmTarget = "17"
+  }
+  packagingOptions {
+    pickFirst "lib/**/libc++_shared.so"
+  }
+}
+
+repositories {
+  flatDir {
+    dirs 'libs'
   }
 }
 
