@@ -21,6 +21,7 @@ class ReactNativeLive2dModule : Module() {
 
     View(ReactNativeLive2dView::class) {
       Name("ReactNativeLive2dView")
+      Events("onModelLoaded", "onError", "onTap")
       
       Prop("modelPath") { view: ReactNativeLive2dView, path: String -> 
         view.loadModel(path) 

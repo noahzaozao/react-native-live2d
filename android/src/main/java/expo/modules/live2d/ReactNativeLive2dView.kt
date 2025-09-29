@@ -3,48 +3,67 @@ package expo.modules.live2d
 import android.content.Context
 import android.util.Log
 import android.view.View
-import android.widget.TextView
+import android.widget.FrameLayout
 import expo.modules.kotlin.AppContext
+import expo.modules.kotlin.events.EventDispatcher
 import expo.modules.kotlin.views.ExpoView
 
 class ReactNativeLive2dView(context: Context, appContext: AppContext) : ExpoView(context, appContext) {
-  private val textView: TextView = TextView(context)
+  private val container: FrameLayout = FrameLayout(context)
+  private val glView: Live2DGLSurfaceView = Live2DGLSurfaceView(context)
+  private val renderer: Live2DRenderer = Live2DRenderer(context)
+  private val events by lazy { EventDispatcher() }
   private var modelPath: String? = null
-  
+
   init {
-    // 设置基本属性
-    textView.text = "Live2D View\n(模型加载中...)"
-    textView.textSize = 16f
-    textView.textAlignment = View.TEXT_ALIGNMENT_CENTER
-    textView.setPadding(20, 20, 20, 20)
-    addView(textView)
+    glView.setEGLContextClientVersion(2)
+    glView.setRenderer(renderer)
+    glView.renderMode = android.opengl.GLSurfaceView.RENDERMODE_CONTINUOUSLY
+    glView.setBackgroundColor(0x00000000)
+
+    container.addView(
+      glView,
+      FrameLayout.LayoutParams(
+        FrameLayout.LayoutParams.MATCH_PARENT,
+        FrameLayout.LayoutParams.MATCH_PARENT
+      )
+    )
+    container.setBackgroundColor(0x00000000)
+    addView(container)
   }
 
   fun loadModel(assetPath: String) {
     Log.d("ReactNativeLive2D", "Loading model: $assetPath")
-    
-    // 处理 public 目录路径
-    val actualPath = if (assetPath.startsWith("public/")) {
-      assetPath.substring(7) // 移除 "public/" 前缀
-    } else {
-      assetPath
-    }
-    
+
+    val actualPath = if (assetPath.startsWith("public/")) assetPath.substring(7) else assetPath
     modelPath = actualPath
-    textView.text = "Live2D View\n模型: $actualPath\n(需要集成 Cubism SDK)"
+    renderer.setModelPath(actualPath)
+    glView.requestRender()
   }
-  
+
   fun startMotion(motionGroup: String, motionIndex: Int) {
     Log.d("ReactNativeLive2D", "Starting motion: $motionGroup[$motionIndex]")
-    textView.text = "Live2D View\n动作: $motionGroup[$motionIndex]\n(需要集成 Cubism SDK)"
+    renderer.startMotion(motionGroup, motionIndex)
   }
-  
+
   fun setExpression(expressionId: String) {
     Log.d("ReactNativeLive2D", "Setting expression: $expressionId")
-    textView.text = "Live2D View\n表情: $expressionId\n(需要集成 Cubism SDK)"
+    renderer.setExpression(expressionId)
   }
-  
-  fun update() {
-    // TODO: 更新模型状态
+
+  override fun onAttachedToWindow() {
+    super.onAttachedToWindow()
+    glView.onResume()
+    renderer.onModelLoaded = {
+      events.dispatch("onModelLoaded", mapOf("ok" to true))
+    }
+    renderer.onError = { msg ->
+      events.dispatch("onError", mapOf("message" to msg))
+    }
+  }
+
+  override fun onDetachedFromWindow() {
+    super.onDetachedFromWindow()
+    glView.onPause()
   }
 }
