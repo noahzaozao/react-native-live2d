@@ -39,20 +39,53 @@ class ReactNativeLive2dModule : Module() {
     AsyncFunction("preloadModel") { modelPath: String, promise: Promise ->
       try {
         Log.d(TAG, "Preloading model: $modelPath")
-        
-        // 检查模型文件是否存在 - 支持从 public 目录加载
-        val assetPath = if (modelPath.startsWith("public/")) {
-          modelPath.substring(7) // 移除 "public/" 前缀
-        } else {
-          modelPath
+
+        // 1) 本地文件：支持 file:// 或 绝对路径
+        if (modelPath.startsWith("file://") || modelPath.startsWith("/")) {
+          val path = if (modelPath.startsWith("file://")) modelPath.removePrefix("file://") else modelPath
+          val file = java.io.File(path)
+          if (!file.exists() || !file.isFile) {
+            throw IOException("Local model file not found: $path")
+          }
+          // 仅校验可读
+          java.io.FileInputStream(file).use { /* no-op */ }
+          Log.d(TAG, "Model preloaded from local file: $path")
+          promise.resolve(null)
+          return@AsyncFunction
         }
-        
-        val inputStream = context.assets.open(assetPath)
-        inputStream.close()
-        
-        Log.d(TAG, "Model preloaded successfully: $assetPath")
-        promise.resolve(null)
-        
+
+        // 2) 资产目录尝试：先按原样尝试，再尝试移除 public/
+        val candidates = mutableListOf<String>()
+        candidates += modelPath
+        if (modelPath.startsWith("public/")) {
+          candidates += modelPath.substring(7)
+        }
+
+        var opened: String? = null
+        var lastError: IOException? = null
+        for (p in candidates) {
+          try {
+            Log.d(TAG, "Trying asset open: $p")
+            context.assets.open(p).use { /* no-op */ }
+            opened = p
+            break
+          } catch (e: IOException) {
+            lastError = e
+          }
+        }
+
+        if (opened != null) {
+          Log.d(TAG, "Model preloaded from assets: $opened")
+          promise.resolve(null)
+        } else {
+          // 打印 live2d 目录下已打包的清单，帮助排查
+          try {
+            val list = context.assets.list("live2d")?.joinToString(", ") ?: "<empty>"
+            Log.e(TAG, "Assets in live2d/: $list")
+          } catch (_: Exception) {}
+          throw lastError ?: IOException("Asset not found for candidates: ${candidates.joinToString()}")
+        }
+
       } catch (e: IOException) {
         Log.e(TAG, "Failed to preload model: ${e.message}")
         promise.reject("MODEL_LOAD_ERROR", "Failed to preload model: ${e.message}", e)
