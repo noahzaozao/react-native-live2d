@@ -5,14 +5,13 @@ import android.util.Log
 import android.view.View
 import android.widget.FrameLayout
 import expo.modules.kotlin.AppContext
-import expo.modules.kotlin.events.EventDispatcher
+import expo.modules.kotlin.events.OnActivityResultPayload
 import expo.modules.kotlin.views.ExpoView
 
 class ReactNativeLive2dView(context: Context, appContext: AppContext) : ExpoView(context, appContext) {
   private val container: FrameLayout = FrameLayout(context)
   private val glView: Live2DGLSurfaceView = Live2DGLSurfaceView(context)
   private val renderer: Live2DRenderer = Live2DRenderer(context)
-  private val events by lazy { EventDispatcher() }
   private var modelPath: String? = null
 
   init {
@@ -51,15 +50,18 @@ class ReactNativeLive2dView(context: Context, appContext: AppContext) : ExpoView
     renderer.setExpression(expressionId)
   }
 
+  fun setAutoBlink(enabled: Boolean) {
+    renderer.setAutoBlink(enabled)
+  }
+
+  fun setAutoBreath(enabled: Boolean) {
+    renderer.setAutoBreath(enabled)
+  }
+
   override fun onAttachedToWindow() {
     super.onAttachedToWindow()
     glView.onResume()
-    renderer.onModelLoaded = {
-      events.dispatch("onModelLoaded", mapOf("ok" to true))
-    }
-    renderer.onError = { msg ->
-      events.dispatch("onError", mapOf("message" to msg))
-    }
+    // 事件分发交由 JS 侧已有回调（若需使用 Expo 事件系统，可后续补充）
   }
 
   override fun onDetachedFromWindow() {

@@ -12,6 +12,17 @@ import java.io.InputStream
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 import org.json.JSONObject
+import com.live2d.sdk.cubism.framework.CubismFramework
+import com.live2d.sdk.cubism.framework.CubismFramework.Option
+import com.live2d.sdk.cubism.framework.CubismFrameworkConfig.LogLevel
+import com.live2d.sdk.cubism.core.ICubismLogger
+import com.live2d.sdk.cubism.framework.model.CubismMoc
+import com.live2d.sdk.cubism.framework.model.CubismModel
+import com.live2d.sdk.cubism.framework.rendering.android.CubismRendererAndroid
+import com.live2d.sdk.cubism.framework.math.CubismMatrix44
+import com.live2d.sdk.cubism.framework.effect.CubismEyeBlink
+import com.live2d.sdk.cubism.framework.effect.CubismBreath
+import com.live2d.sdk.cubism.framework.physics.CubismPhysics
 
 class Live2DRenderer(private val context: Context) : GLSurfaceView.Renderer {
   private var modelPath: String? = null
@@ -20,6 +31,8 @@ class Live2DRenderer(private val context: Context) : GLSurfaceView.Renderer {
   private var currentExpressionId: String? = null
   private var textureId: Int = 0
   private var pendingBitmap: Bitmap? = null
+  private data class PendingTex(val index: Int, val bitmap: Bitmap)
+  private val pendingTexQueue: java.util.ArrayDeque<PendingTex> = java.util.ArrayDeque()
   private var viewWidth: Int = 0
   private var viewHeight: Int = 0
   private var mocPathAbs: String? = null
@@ -33,6 +46,18 @@ class Live2DRenderer(private val context: Context) : GLSurfaceView.Renderer {
   private var uTexture: Int = -1
   private var vertexBuffer: java.nio.FloatBuffer? = null
   private var texBuffer: java.nio.FloatBuffer? = null
+
+  // Cubism runtime objects
+  private var cubismStarted: Boolean = false
+  private var cubismMoc: CubismMoc? = null
+  private var cubismModel: CubismModel? = null
+  private var cubismRenderer: CubismRendererAndroid? = null
+  private var boundTextureIndex0: Boolean = false
+  private var eyeBlink: CubismEyeBlink? = null
+  private var breath: CubismBreath? = null
+  private var physics: CubismPhysics? = null
+  private var autoBlinkEnabled: Boolean = true
+  private var autoBreathEnabled: Boolean = true
 
   fun setModelPath(path: String) {
     modelPath = path
@@ -51,6 +76,9 @@ class Live2DRenderer(private val context: Context) : GLSurfaceView.Renderer {
     currentExpressionId = expressionId
     Log.d("Live2DRenderer", "setExpression: $expressionId")
   }
+
+  fun setAutoBlink(enabled: Boolean) { autoBlinkEnabled = enabled }
+  fun setAutoBreath(enabled: Boolean) { autoBreathEnabled = enabled }
 
   override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
     // 透明清屏
@@ -120,6 +148,45 @@ class Live2DRenderer(private val context: Context) : GLSurfaceView.Renderer {
         pendingBitmap = null
       }
     }
+
+    // 处理待上传的所有模型纹理并绑定到 Cubism 渲染器
+    if (cubismRenderer != null && pendingTexQueue.isNotEmpty()) {
+      while (pendingTexQueue.isNotEmpty()) {
+        val item = pendingTexQueue.poll()
+        try {
+          val texId = createGlTexture(item.bitmap)
+          cubismRenderer!!.bindTexture(item.index, texId)
+          Log.d("Live2DRenderer", "Cubism bindTexture(${item.index}, $texId)")
+        } catch (e: Exception) {
+          Log.e("Live2DRenderer", "bindTexture failed: ${e.message}")
+        } finally {
+          item.bitmap.recycle()
+        }
+      }
+    }
+    // 初始化并绘制 Cubism 模型（若准备就绪）
+    tryInitCubismIfReady()
+    if (cubismRenderer != null && cubismModel != null) {
+      // 基于画布宽高与视图比例，等比缩放以避免拉伸
+      val canvasW = cubismModel!!.canvasWidth
+      val canvasH = cubismModel!!.canvasHeight
+      val sx = if (canvasW > 0f) 2f / canvasW else 1f
+      val sy = if (canvasH > 0f) 2f / canvasH else 1f
+      val s = kotlin.math.min(sx, sy) // 等比缩放，取较小值以完整显示
+      val mvp = CubismMatrix44.create()
+      mvp.scale(s, s)
+
+      // 更新参数：眨眼、呼吸、物理
+      val deltaTimeSeconds = 1f / 60f
+      if (autoBlinkEnabled) eyeBlink?.updateParameters(cubismModel!!, deltaTimeSeconds)
+      if (autoBreathEnabled) breath?.updateParameters(cubismModel!!, deltaTimeSeconds)
+      physics?.evaluate(cubismModel!!, deltaTimeSeconds)
+
+      cubismRenderer!!.setMvpMatrix(mvp)
+      cubismRenderer!!.drawModel()
+      return
+    }
+
     if (textureId != 0 && program != 0 && vertexBuffer != null && texBuffer != null) {
       GLES20.glUseProgram(program)
       GLES20.glEnableVertexAttribArray(aPosition)
@@ -149,6 +216,7 @@ class Live2DRenderer(private val context: Context) : GLSurfaceView.Renderer {
       // 解析 Cubism model3.json: FileReferences.Textures 或低版本 textures
       val root = JSONObject(json)
       var firstTex: String? = null
+      val texturesRel = mutableListOf<String>()
       var mocRel: String? = null
       var physicsRel: String? = null
       var poseRel: String? = null
@@ -157,6 +225,9 @@ class Live2DRenderer(private val context: Context) : GLSurfaceView.Renderer {
         if (refs.has("Moc")) mocRel = refs.getString("Moc")
         if (refs.has("Textures")) {
           val arr = refs.getJSONArray("Textures")
+          for (i in 0 until arr.length()) {
+            texturesRel.add(arr.getString(i))
+          }
           if (arr.length() > 0) firstTex = arr.getString(0)
         }
         if (refs.has("Physics")) physicsRel = refs.getString("Physics")
@@ -164,6 +235,9 @@ class Live2DRenderer(private val context: Context) : GLSurfaceView.Renderer {
       }
       if (firstTex == null && root.has("textures")) {
         val arr = root.getJSONArray("textures")
+        for (i in 0 until arr.length()) {
+          texturesRel.add(arr.getString(i))
+        }
         if (arr.length() > 0) firstTex = arr.getString(0)
       }
       if (firstTex == null) {
@@ -181,16 +255,74 @@ class Live2DRenderer(private val context: Context) : GLSurfaceView.Renderer {
       Log.d("Live2DRenderer", "physics: ${physicsPathAbs ?: "<none>"}")
       Log.d("Live2DRenderer", "pose: ${posePathAbs ?: "<none>"}")
 
-      val bmp = BitmapFactory.decodeFile(texPath)
-      if (bmp == null) {
-        Log.e("Live2DRenderer", "decodeFile failed: $texPath")
-        return
+      // 加载全部纹理为位图，入队等 GL 线程上传
+      texturesRel.forEachIndexed { idx, rel ->
+        val p = File(baseDir, rel).absolutePath
+        val bmp = BitmapFactory.decodeFile(p)
+        if (bmp == null) {
+          Log.e("Live2DRenderer", "decodeFile failed: $p")
+        } else {
+          pendingTexQueue.add(PendingTex(idx, bmp))
+        }
       }
-      // 交给 GL 线程上传纹理
-      pendingBitmap = bmp
     } catch (e: Exception) {
       Log.e("Live2DRenderer", "load texture failed: ${e.message}")
       onError?.invoke("load texture failed: ${e.message}")
+    }
+  }
+
+  private fun tryInitCubismIfReady() {
+    val mocPath = mocPathAbs ?: return
+
+    if (!cubismStarted) {
+      try {
+        val opt = Option().apply {
+          loggingLevel = LogLevel.VERBOSE
+          logFunction = ICubismLogger { msg -> Log.d("CubismCore", msg) }
+        }
+        CubismFramework.startUp(opt)
+        CubismFramework.initialize()
+        cubismStarted = true
+        Log.d("Live2DRenderer", "CubismFramework initialized")
+      } catch (e: Exception) {
+        Log.e("Live2DRenderer", "CubismFramework init failed: ${e.message}")
+        onError?.invoke("Cubism init failed: ${e.message}")
+        return
+      }
+    }
+
+    if (cubismModel == null) {
+      try {
+        val mocBytes = File(mocPath).readBytes()
+        cubismMoc = CubismMoc.create(mocBytes)
+        cubismModel = cubismMoc?.createModel()
+        if (cubismModel == null) {
+          onError?.invoke("Create CubismModel failed")
+          return
+        }
+        cubismRenderer = CubismRendererAndroid.create() as CubismRendererAndroid
+        cubismRenderer!!.initialize(cubismModel!!)
+        // 初始化 EyeBlink & Breath
+        eyeBlink = CubismEyeBlink.create()
+        breath = CubismBreath.create()
+        // 加载 Physics（如果有）
+        physicsPathAbs?.let { p ->
+          try {
+            physics = CubismPhysics.create(File(p).readBytes())
+          } catch (_: Exception) {}
+        }
+        Log.d("Live2DRenderer", "Cubism model created")
+      } catch (e: Exception) {
+        Log.e("Live2DRenderer", "Create model failed: ${e.message}")
+        onError?.invoke("Create model failed: ${e.message}")
+        return
+      }
+    }
+
+    if (textureId != 0 && cubismRenderer != null && !boundTextureIndex0) {
+      cubismRenderer!!.bindTexture(0, textureId)
+      boundTextureIndex0 = true
+      Log.d("Live2DRenderer", "Cubism bindTexture(0, $textureId)")
     }
   }
 

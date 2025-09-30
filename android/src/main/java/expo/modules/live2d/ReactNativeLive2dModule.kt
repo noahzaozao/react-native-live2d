@@ -35,6 +35,14 @@ class ReactNativeLive2dModule : Module() {
       Prop("expression") { view: ReactNativeLive2dView, expression: String ->
         view.setExpression(expression)
       }
+
+      Prop("autoBlink") { view: ReactNativeLive2dView, enabled: Boolean ->
+        view.setAutoBlink(enabled)
+      }
+
+      Prop("autoBreath") { view: ReactNativeLive2dView, enabled: Boolean ->
+        view.setAutoBreath(enabled)
+      }
     }
 
     AsyncFunction("preloadModel") { modelPath: String, promise: Promise ->
