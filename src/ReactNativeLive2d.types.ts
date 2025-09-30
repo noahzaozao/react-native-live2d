@@ -38,16 +38,10 @@ export interface Live2DViewProps {
   scale?: number;
   
   /**
-   * 模型 X 轴偏移
-   * @default 0
+   * 模型位置 (X, Y 坐标)
+   * @default { x: 0, y: 0 }
    */
-  offsetX?: number;
-  
-  /**
-   * 模型 Y 轴偏移
-   * @default 0
-   */
-  offsetY?: number;
+  position?: { x: number; y: number };
   
   /**
    * 视图样式
@@ -77,6 +71,11 @@ export interface Live2DViewProps {
 
 export interface Live2DModule {
   /**
+   * 初始化 Live2D 框架
+   */
+  initializeLive2D(): Promise<boolean>;
+  
+  /**
    * 预加载模型资源
    * @param modelPath 模型文件路径
    */
@@ -89,6 +88,11 @@ export interface Live2DModule {
   releaseModel(modelPath: string): Promise<void>;
   
   /**
+   * 获取可用模型列表
+   */
+  getAvailableModels(): Promise<string[]>;
+  
+  /**
    * 获取可用动作列表
    * @param modelPath 模型文件路径
    */
@@ -99,4 +103,24 @@ export interface Live2DModule {
    * @param modelPath 模型文件路径
    */
   getAvailableExpressions(modelPath: string): Promise<string[]>;
+  
+  /**
+   * 开始播放动作
+   * @param motionGroup 动作组名称
+   * @param motionIndex 动作索引
+   * @param priority 优先级
+   */
+  startMotion(motionGroup: string, motionIndex: number, priority: number): Promise<boolean>;
+  
+  /**
+   * 设置表情
+   * @param expressionId 表情 ID
+   */
+  setExpression(expressionId: string): Promise<boolean>;
+  
+  /**
+   * 切换场景
+   * @param modelIndex 模型索引
+   */
+  changeScene(modelIndex: number): Promise<boolean>;
 }

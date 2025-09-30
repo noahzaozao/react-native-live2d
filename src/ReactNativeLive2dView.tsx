@@ -12,8 +12,7 @@ export default function ReactNativeLive2dView(props: Live2DViewProps) {
     autoBreath = true,
     autoBlink = true,
     scale = 1.0,
-    offsetX = 0,
-    offsetY = 0,
+    position = { x: 0, y: 0 },
     onTap,
     onModelLoaded,
     onError,
@@ -33,8 +32,7 @@ export default function ReactNativeLive2dView(props: Live2DViewProps) {
       autoBreath={autoBreath}
       autoBlink={autoBlink}
       scale={scale}
-      offsetX={offsetX}
-      offsetY={offsetY}
+      position={position}
       onTouchEnd={handleTap}
       style={[{ flex: 1, backgroundColor: 'transparent' }, style]}
       {...otherProps}
