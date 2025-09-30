@@ -239,7 +239,7 @@ public class LAppDefine {
      * Set to false because BitmapFactory.decodeStream() already loads textures as premultiplied alpha.
      * Setting this to true would cause double premultiplied alpha processing, resulting in black shadows.
      */
-    public static final boolean PREMULTIPLIED_ALPHA_ENABLE = false;
+    public static final boolean PREMULTIPLIED_ALPHA_ENABLE = true;
 
 
 }

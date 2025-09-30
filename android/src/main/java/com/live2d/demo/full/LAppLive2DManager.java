@@ -59,9 +59,9 @@ public class LAppLive2DManager {
         int width = LAppDelegate.getInstance().getWindowWidth();
         int height = LAppDelegate.getInstance().getWindowHeight();
 
-        if (DEBUG_LOG_ENABLE) {
-            LAppPal.printLog("onUpdate: Total models: " + models.size() + ", Window size: " + width + "x" + height);
-        }
+        // if (DEBUG_LOG_ENABLE) {
+        //     LAppPal.printLog("onUpdate: Total models: " + models.size() + ", Window size: " + width + "x" + height);
+        // }
 
         for (int i = 0; i < models.size(); i++) {
             LAppModel model = models.get(i);
@@ -78,31 +78,31 @@ public class LAppLive2DManager {
             // 画面比率を考慮した投影矩阵を設定
             float aspectRatio = (float) width / (float) height;
             
-            if (DEBUG_LOG_ENABLE) {
-                LAppPal.printLog("onUpdate: Model " + i + " - Screen: " + width + "x" + height + ", aspect ratio: " + aspectRatio);
-            }
+            // if (DEBUG_LOG_ENABLE) {
+            //     LAppPal.printLog("onUpdate: Model " + i + " - Screen: " + width + "x" + height + ", aspect ratio: " + aspectRatio);
+            // }
             
             if (aspectRatio > 1.0f) {
                 // 横長画面の場合
                 projection.scale(1.0f / aspectRatio, 1.0f);
-                if (DEBUG_LOG_ENABLE) {
-                    LAppPal.printLog("onUpdate: Landscape mode - scaling by (1/" + aspectRatio + ", 1.0)");
-                }
+                // if (DEBUG_LOG_ENABLE) {
+                //     LAppPal.printLog("onUpdate: Landscape mode - scaling by (1/" + aspectRatio + ", 1.0)");
+                // }
             } else {
                 // 縦長画面の場合
                 projection.scale(1.0f, aspectRatio);
-                if (DEBUG_LOG_ENABLE) {
-                    LAppPal.printLog("onUpdate: Portrait mode - scaling by (1.0, " + aspectRatio + ")");
-                }
+                // if (DEBUG_LOG_ENABLE) {
+                //     LAppPal.printLog("onUpdate: Portrait mode - scaling by (1.0, " + aspectRatio + ")");
+                // }
             }
             
             // モデルを画面中央に配置し、適切なサイズに調整
             projection.translateRelative(0.0f, 0.0f);
             projection.scaleRelative(1.0f, 1.0f);
 
-            if (DEBUG_LOG_ENABLE) {
-                LAppPal.printLog("onUpdate: Projection matrix configured for model " + i);
-            }
+            // if (DEBUG_LOG_ENABLE) {
+            //     LAppPal.printLog("onUpdate: Projection matrix configured for model " + i);
+            // }
 
             // モデル1体描画前コール
             LAppDelegate.getInstance().getView().preModelDraw(model);
@@ -232,6 +232,9 @@ public class LAppLive2DManager {
      */
     public void addModel(LAppModel model) {
         if (DEBUG_LOG_ENABLE) {
+            LAppPal.printLog("addModel: Starting - Thread: " + Thread.currentThread().getName());
+            LAppPal.printLog("addModel: Model parameter: " + (model != null ? "not null" : "null"));
+            LAppPal.printLog("addModel: Models list: " + (models != null ? "not null" : "null"));
             LAppPal.printLog("addModel: Adding model, current count: " + models.size());
             // 打印调用栈来追踪模型创建来源
             StackTraceElement[] stackTrace = Thread.currentThread().getStackTrace();
@@ -239,9 +242,22 @@ public class LAppLive2DManager {
                 LAppPal.printLog("addModel: Stack[" + i + "]: " + stackTrace[i].toString());
             }
         }
-        models.add(model);
-        if (DEBUG_LOG_ENABLE) {
-            LAppPal.printLog("addModel: Model added, new count: " + models.size());
+        
+        try {
+            if (DEBUG_LOG_ENABLE) {
+                LAppPal.printLog("addModel: About to add model to list");
+            }
+            models.add(model);
+            if (DEBUG_LOG_ENABLE) {
+                LAppPal.printLog("addModel: Model added successfully, new count: " + models.size());
+                LAppPal.printLog("addModel: Completed successfully");
+            }
+        } catch (Exception e) {
+            if (DEBUG_LOG_ENABLE) {
+                LAppPal.printLog("addModel: Exception occurred while adding model: " + e.getMessage());
+                e.printStackTrace();
+            }
+            throw e; // 重新抛出异常
         }
     }
 

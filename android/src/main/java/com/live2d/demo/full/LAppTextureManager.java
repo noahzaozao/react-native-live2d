@@ -61,6 +61,11 @@ public class LAppTextureManager {
         GLES20.glGenTextures(1, textureId, 0);
         GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, textureId[0]);
 
+        // 对齐与环绕参数，防止某些设备出现读取与采样异常
+        GLES20.glPixelStorei(GLES20.GL_UNPACK_ALIGNMENT, 1);
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_CLAMP_TO_EDGE);
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE);
+
         // メモリ上の2D画像をテクスチャに割り当てる
         GLUtils.texImage2D(GLES20.GL_TEXTURE_2D, 0, bitmap, 0);
 
@@ -93,9 +98,16 @@ public class LAppTextureManager {
 
     // 从文件系统加载纹理
     public TextureInfo createTextureFromFileSystem(String filePath) {
+        if (LAppDefine.DEBUG_LOG_ENABLE) {
+            LAppPal.printLog("createTextureFromFileSystem: Attempting to load " + filePath);
+        }
+        
         // search loaded texture already
         for (TextureInfo textureInfo : textures) {
             if (textureInfo.filePath.equals(filePath)) {
+                if (LAppDefine.DEBUG_LOG_ENABLE) {
+                    LAppPal.printLog("createTextureFromFileSystem: Texture already loaded " + filePath);
+                }
                 return textureInfo;
             }
         }
@@ -104,14 +116,21 @@ public class LAppTextureManager {
         FileInputStream stream = null;
         try {
             File file = new File(filePath);
+            if (LAppDefine.DEBUG_LOG_ENABLE) {
+                LAppPal.printLog("createTextureFromFileSystem: File exists check - " + file.exists() + " for " + filePath);
+                LAppPal.printLog("createTextureFromFileSystem: File absolute path - " + file.getAbsolutePath());
+            }
             if (!file.exists()) {
                 if (LAppDefine.DEBUG_LOG_ENABLE) {
-                    CubismFramework.coreLogFunction("Texture file not found: " + filePath);
+                    LAppPal.printLog("Texture file not found: " + filePath);
                 }
                 return null;
             }
             stream = new FileInputStream(file);
         } catch (Exception e) {
+            if (LAppDefine.DEBUG_LOG_ENABLE) {
+                LAppPal.printLog("createTextureFromFileSystem: Exception opening file " + filePath + ": " + e.getMessage());
+            }
             e.printStackTrace();
             return null;
         }
@@ -127,7 +146,7 @@ public class LAppTextureManager {
 
         if (bitmap == null) {
             if (LAppDefine.DEBUG_LOG_ENABLE) {
-                CubismFramework.coreLogFunction("Failed to decode bitmap from: " + filePath);
+                LAppPal.printLog("Failed to decode bitmap from: " + filePath);
             }
             return null;
         }
@@ -164,7 +183,7 @@ public class LAppTextureManager {
         bitmap = null;
 
         if (LAppDefine.DEBUG_LOG_ENABLE) {
-            CubismFramework.coreLogFunction("Create texture from file system: " + filePath);
+            LAppPal.printLog("Create texture from file system: " + filePath);
         }
 
         return textureInfo;

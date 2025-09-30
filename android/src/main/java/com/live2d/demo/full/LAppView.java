@@ -91,21 +91,61 @@ public class LAppView implements AutoCloseable {
         LAppTextureManager textureManager = LAppDelegate.getInstance().getTextureManager();
 
         // 背景画像の読み込み
-        LAppTextureManager.TextureInfo backgroundTexture = textureManager.createTextureFromPngFile(ResourcePath.ROOT.getPath() + ResourcePath.BACK_IMAGE.getPath());
-
+        String backgroundPath = ResourcePath.ROOT.getPath() + ResourcePath.BACK_IMAGE.getPath();
+        if (LAppDefine.DEBUG_LOG_ENABLE) {
+            android.util.Log.d("LAppView", "initializeSprite: Loading background texture from: " + backgroundPath);
+        }
+        
+        LAppTextureManager.TextureInfo backgroundTexture = textureManager.createTextureFromPngFile(backgroundPath);
+        
+        if (LAppDefine.DEBUG_LOG_ENABLE) {
+            android.util.Log.d("LAppView", "initializeSprite: Background texture loaded - ID: " + backgroundTexture.id + 
+                ", Width: " + backgroundTexture.width + ", Height: " + backgroundTexture.height);
+        }
 
         // x,yは画像の中心座標
         float x = windowWidth * 0.5f;
         float y = windowHeight * 0.5f;
-        float fWidth = backgroundTexture.width * 2.0f;
-        float fHeight = windowHeight * 0.95f;
+        
+        // 计算适合屏幕的背景尺寸
+        float aspectRatio = (float) backgroundTexture.width / backgroundTexture.height;
+        float screenAspectRatio = (float) windowWidth / windowHeight;
+        
+        float fWidth, fHeight;
+        if (aspectRatio > screenAspectRatio) {
+            // 背景图片更宽，以高度为准
+            fHeight = windowHeight;
+            fWidth = fHeight * aspectRatio;
+        } else {
+            // 背景图片更高，以宽度为准
+            fWidth = windowWidth;
+            fHeight = fWidth / aspectRatio;
+        }
+        
+        if (LAppDefine.DEBUG_LOG_ENABLE) {
+            android.util.Log.d("LAppView", "initializeSprite: Background sizing - " +
+                "Original: " + backgroundTexture.width + "x" + backgroundTexture.height + 
+                ", Screen: " + windowWidth + "x" + windowHeight + 
+                ", Final: " + fWidth + "x" + fHeight);
+        }
 
         int programId = spriteShader.getShaderId();
+        
+        if (LAppDefine.DEBUG_LOG_ENABLE) {
+            android.util.Log.d("LAppView", "initializeSprite: Creating background sprite - " +
+                "Position: (" + x + ", " + y + "), Size: (" + fWidth + ", " + fHeight + "), ProgramID: " + programId);
+        }
 
         if (backSprite == null) {
             backSprite = new LAppSprite(x, y, fWidth, fHeight, backgroundTexture.id, programId);
+            if (LAppDefine.DEBUG_LOG_ENABLE) {
+                android.util.Log.d("LAppView", "initializeSprite: Background sprite created");
+            }
         } else {
             backSprite.resize(x, y, fWidth, fHeight);
+            if (LAppDefine.DEBUG_LOG_ENABLE) {
+                android.util.Log.d("LAppView", "initializeSprite: Background sprite resized");
+            }
         }
 
         // 歯車画像の読み込み
@@ -155,24 +195,48 @@ public class LAppView implements AutoCloseable {
         int maxWidth = LAppDelegate.getInstance().getWindowWidth();
         int maxHeight = LAppDelegate.getInstance().getWindowHeight();
 
-        backSprite.setWindowSize(maxWidth, maxHeight);
-        gearSprite.setWindowSize(maxWidth, maxHeight);
-        powerSprite.setWindowSize(maxWidth, maxHeight);
+        // 设置 OpenGL 状态
+        GLES20.glEnable(GLES20.GL_BLEND);
+        GLES20.glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        GLES20.glDisable(GLES20.GL_DEPTH_TEST);
+        GLES20.glDisable(GLES20.GL_CULL_FACE);
+        
+        // if (LAppDefine.DEBUG_LOG_ENABLE) {
+        //     android.util.Log.d("LAppView", "render: OpenGL state configured for rendering");
+        // }
 
-        // UIと背景の描画
-        backSprite.render();
-        gearSprite.render();
-        powerSprite.render();
+        // 首先渲染背景
+        if (backSprite != null) {
+            // if (LAppDefine.DEBUG_LOG_ENABLE) {
+            //     android.util.Log.d("LAppView", "render: Rendering background sprite");
+            // }
+            backSprite.setWindowSize(maxWidth, maxHeight);
+            backSprite.render();
+        } else {
+            if (LAppDefine.DEBUG_LOG_ENABLE) {
+                android.util.Log.w("LAppView", "render: backSprite is null!");
+            }
+        }
+
+        // 然后渲染Live2D模型
+        LAppLive2DManager live2dManager = LAppLive2DManager.getInstance();
+        live2dManager.onUpdate();
+
+        // 最后渲染UI元素，显示在最上层
+        if (gearSprite != null) {
+            gearSprite.setWindowSize(maxWidth, maxHeight);
+            gearSprite.render();
+        }
+        if (powerSprite != null) {
+            powerSprite.setWindowSize(maxWidth, maxHeight);
+            powerSprite.render();
+        }
 
         if (isChangedModel) {
             isChangedModel = false;
             // 场景切换功能已移除，现在统一使用文件系统路径加载模型
             android.util.Log.d("LAppView", "Model switching via gear button is no longer supported");
         }
-
-        // モデルの描画
-        LAppLive2DManager live2dManager = LAppLive2DManager.getInstance();
-        live2dManager.onUpdate();
 
         // 各モデルが持つ描画ターゲットをテクスチャとする場合
         if (renderingTarget == RenderingTarget.MODEL_FRAME_BUFFER && renderingSprite != null) {
@@ -207,13 +271,13 @@ public class LAppView implements AutoCloseable {
         // 別のレンダリングターゲットへ向けて描画する場合の使用するオフスクリーンサーフェス
         CubismOffscreenSurfaceAndroid useTarget;
 
-        // 透過設定
+        // 透過設定 - 模型使用预乘Alpha混合
+        GLES20.glEnable(GLES20.GL_BLEND);
         GLES20.glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
         
-        // Debug: Check OpenGL state
-        if (LAppDefine.DEBUG_LOG_ENABLE) {
-            android.util.Log.d("LAppView", "preModelDraw: Blend function set to GL_ONE, GL_ONE_MINUS_SRC_ALPHA");
-        }
+        // if (LAppDefine.DEBUG_LOG_ENABLE) {
+        //     android.util.Log.d("LAppView", "preModelDraw: Blend function set to GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA");
+        // }
 
         // 別のレンダリングターゲットへ向けて描画する場合
         if (renderingTarget != RenderingTarget.NONE) {

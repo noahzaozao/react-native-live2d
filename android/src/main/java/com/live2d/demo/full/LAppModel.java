@@ -353,11 +353,11 @@ public class LAppModel extends CubismUserModel {
             return;
         }
 
-        if (LAppDefine.DEBUG_LOG_ENABLE) {
-            android.util.Log.d("LAppModel", "draw: Starting draw for model");
-            android.util.Log.d("LAppModel", "draw: Renderer state - " + 
-                "isPremultipliedAlpha: " + this.<CubismRendererAndroid>getRenderer().isPremultipliedAlpha());
-        }
+        // if (LAppDefine.DEBUG_LOG_ENABLE) {
+        //     android.util.Log.d("LAppModel", "draw: Starting draw for model");
+        //     android.util.Log.d("LAppModel", "draw: Renderer state - " + 
+        //         "isPremultipliedAlpha: " + this.<CubismRendererAndroid>getRenderer().isPremultipliedAlpha());
+        // }
 
         // キャッシュ変数の定義を避けるために、multiplyByMatrix()ではなく、multiply()を使用する。
         CubismMatrix44.multiply(
@@ -368,15 +368,15 @@ public class LAppModel extends CubismUserModel {
 
         this.<CubismRendererAndroid>getRenderer().setMvpMatrix(matrix);
         
-        if (LAppDefine.DEBUG_LOG_ENABLE) {
-            android.util.Log.d("LAppModel", "draw: MVP matrix set, calling drawModel");
-        }
+        // if (LAppDefine.DEBUG_LOG_ENABLE) {
+        //     android.util.Log.d("LAppModel", "draw: MVP matrix set, calling drawModel");
+        // }
         
         this.<CubismRendererAndroid>getRenderer().drawModel();
         
-        if (LAppDefine.DEBUG_LOG_ENABLE) {
-            android.util.Log.d("LAppModel", "draw: drawModel completed");
-        }
+        // if (LAppDefine.DEBUG_LOG_ENABLE) {
+        //     android.util.Log.d("LAppModel", "draw: drawModel completed");
+        // }
     }
 
     /**
@@ -857,11 +857,8 @@ public class LAppModel extends CubismUserModel {
 
             this.<CubismRendererAndroid>getRenderer().bindTexture(modelTextureNumber, glTextureNumber);
 
-            if (LAppDefine.PREMULTIPLIED_ALPHA_ENABLE) {
-                this.<CubismRendererAndroid>getRenderer().isPremultipliedAlpha(true);
-            } else {
-                this.<CubismRendererAndroid>getRenderer().isPremultipliedAlpha(false);
-            }
+            // 文件系统路径的Bitmap通常为非预乘
+            this.<CubismRendererAndroid>getRenderer().isPremultipliedAlpha(LAppDefine.PREMULTIPLIED_ALPHA_ENABLE);
         }
         
         LAppPal.printLog("setupTexturesFromFileSystem: Texture setup completed");

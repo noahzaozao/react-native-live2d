@@ -37,6 +37,8 @@ public class LAppSprite {
         textureLocation = GLES20.glGetUniformLocation(programId, "texture");
         colorLocation = GLES20.glGetUniformLocation(programId, "baseColor");
 
+        this.programId = programId;
+
         spriteColor[0] = 1.0f;
         spriteColor[1] = 1.0f;
         spriteColor[2] = 1.0f;
@@ -44,6 +46,15 @@ public class LAppSprite {
     }
 
     public void render() {
+        // 确保使用精灵着色器
+        GLES20.glUseProgram(programId);
+        // 添加调试日志
+        if (com.live2d.demo.LAppDefine.DEBUG_LOG_ENABLE) {
+            android.util.Log.d("LAppSprite", "render: Starting sprite render - TextureID: " + textureId + 
+                ", Window: " + maxWidth + "x" + maxHeight + 
+                ", Rect: (" + rect.left + ", " + rect.up + ", " + rect.right + ", " + rect.down + ")");
+        }
+        
         // Set the camera position (View matrix)
         uvVertex[0] = 1.0f;
         uvVertex[1] = 0.0f;
@@ -214,6 +225,7 @@ public class LAppSprite {
 
     private final Rect rect = new Rect();
     private final int textureId;
+    private final int programId;
 
     private final int positionLocation;  // 位置アトリビュート
     private final int uvLocation; // UVアトリビュート

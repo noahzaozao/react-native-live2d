@@ -28,8 +28,15 @@ class ReactNativeLive2dModule : Module() {
       Name("ReactNativeLive2dView")
       Events("onModelLoaded", "onError", "onTap", "onMotionFinished")
       
-      Prop("modelPath") { view: ReactNativeLive2dView, path: String -> 
-        view.loadModel(path) 
+      Prop("modelPath") { view: ReactNativeLive2dView, path: String? -> 
+        Log.d(TAG, "modelPath prop received: '$path'")
+        if (path != null && path.isNotEmpty()) {
+          Log.d(TAG, "Calling view.loadModel with path: '$path'")
+          view.loadModel(path) 
+          Log.d(TAG, "view.loadModel call completed for path: '$path'")
+        } else {
+          Log.d(TAG, "modelPath is null or empty, skipping model loading")
+        }
       }
       
       Prop("motionGroup") { view: ReactNativeLive2dView, group: String ->

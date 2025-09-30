@@ -74,6 +74,9 @@ class ReactNativeLive2dView(context: Context, appContext: AppContext) : ExpoView
     try {
       Log.d(TAG, "Setting up GLSurfaceView with basic configuration")
       
+      // 首先初始化Live2D，确保在GLSurfaceView生命周期开始前完成
+      initializeLive2D()
+      
       // 基本的 OpenGL ES 2.0 设置
       glSurfaceView.setEGLContextClientVersion(2)
       Log.d(TAG, "Set EGL context client version to 2")
@@ -135,7 +138,7 @@ class ReactNativeLive2dView(context: Context, appContext: AppContext) : ExpoView
         Log.d(TAG, "LAppDelegate initialized, waiting for GLSurfaceView to call onSurfaceCreated")
         
         isInitialized = true
-        Log.d(TAG, "Live2D initialized successfully")
+        // Log.d(TAG, "Live2D initialized successfully")
       } catch (e: Exception) {
         Log.e(TAG, "Failed to initialize Live2D: ${e.message}", e)
         // 发送错误事件
@@ -170,37 +173,38 @@ class ReactNativeLive2dView(context: Context, appContext: AppContext) : ExpoView
     }
 
     try {
-      initializeLive2D()
-      
       // 处理路径格式，统一转换为文件系统绝对路径
       val fullPath = when {
-        // 处理 file:// URI
         modelPath.startsWith("file://") -> modelPath.substring(7)
-        // 处理绝对路径
         modelPath.startsWith("/") -> modelPath
-        // 处理 public/ 前缀的相对路径
         modelPath.startsWith("public/") -> {
-          val relativePath = modelPath.substring(7) // 移除 "public/" 前缀
+          val relativePath = modelPath.substring(7)
           "${context.cacheDir.absolutePath}/$relativePath"
         }
-        // 处理其他相对路径
         else -> "${context.cacheDir.absolutePath}/$modelPath"
       }
-      
+
       this.modelPath = fullPath
       Log.d(TAG, "Resolved model path: $fullPath")
-      
-      // 通过 LAppLive2DManager 加载模型
-      val manager = LAppLive2DManager.getInstance()
-      loadModelFromFileSystem(fullPath, manager)
-      
-      glSurfaceView.requestRender()
-      
-      // 发送模型加载成功事件
-      dispatchEvent("onModelLoaded", mapOf(
-        "modelPath" to fullPath
-      ))
-      
+
+      // 确保在 GL 线程加载模型与创建纹理
+      glSurfaceView.queueEvent {
+        try {
+          val manager = LAppLive2DManager.getInstance()
+          loadModelFromFileSystem(fullPath, manager)
+          glSurfaceView.requestRender()
+          dispatchEvent("onModelLoaded", mapOf(
+            "modelPath" to fullPath
+          ))
+        } catch (e: Exception) {
+          Log.e(TAG, "Failed to load model on GL thread: ${e.message}")
+          dispatchEvent("onError", mapOf(
+            "error" to "MODEL_LOAD_ERROR",
+            "message" to "Failed to load model: ${e.message}"
+          ))
+        }
+      }
+
     } catch (e: Exception) {
       Log.e(TAG, "Failed to load model: ${e.message}")
       dispatchEvent("onError", mapOf(

@@ -1,6 +1,6 @@
-import { ViewStyle, StyleProp } from 'react-native';
+import { StyleProp, ViewStyle } from 'react-native';
 
-export interface Live2DViewProps {
+export interface ReactNativeLive2DViewProps {
   /**
    * Live2D 模型文件路径 (相对于 assets 目录)
    * 例如: "models/Haru/Haru.model3.json"
