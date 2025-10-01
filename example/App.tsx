@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import ReactNativeLive2dModule from '../src/ReactNativeLive2dModule';
 import ReactNativeLive2dView from '../src/ReactNativeLive2dView';
 
 export default function App() {
@@ -26,15 +25,6 @@ export default function App() {
 
   const changeExpression = (expression: string) => {
     setCurrentExpression(expression);
-  };
-
-  const preloadModel = async () => {
-    try {
-      await ReactNativeLive2dModule.preloadModel('models/Haru/Haru.model3.json');
-      Alert.alert('成功', '模型预加载完成！');
-    } catch (error) {
-      Alert.alert('错误', `预加载失败: ${error}`);
-    }
   };
 
   return (
@@ -88,9 +78,6 @@ export default function App() {
           ))}
         </View>
 
-        <TouchableOpacity style={styles.preloadButton} onPress={preloadModel}>
-          <Text style={styles.preloadButtonText}>预加载模型</Text>
-        </TouchableOpacity>
       </View>
     </View>
   );
@@ -161,16 +148,5 @@ const styles = StyleSheet.create({
   buttonText: {
     color: '#333',
     fontSize: 12,
-  },
-  preloadButton: {
-    backgroundColor: '#34C759',
-    paddingVertical: 12,
-    borderRadius: 5,
-    alignItems: 'center',
-  },
-  preloadButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
   },
 });

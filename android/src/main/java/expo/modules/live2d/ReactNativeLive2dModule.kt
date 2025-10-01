@@ -77,47 +77,6 @@ class ReactNativeLive2dModule : Module() {
       }
     }
 
-    AsyncFunction("preloadModel") { modelPath: String, promise: Promise ->
-      try {
-        Log.d(TAG, "Preloading model: $modelPath")
-
-        // 处理不同类型的路径
-        val fileToCheck = when {
-          // 处理 file:// URI
-          modelPath.startsWith("file://") -> {
-            val uri = URI(modelPath)
-            File(uri.path)
-          }
-          // 处理绝对路径
-          modelPath.startsWith("/") -> {
-            File(modelPath)
-          }
-          // 处理相对路径（assets）
-          else -> {
-            val actualPath = if (modelPath.startsWith("public/")) modelPath.substring(7) else modelPath
-            // 对于 assets，我们只是验证路径格式，实际加载由 Live2D 引擎处理
-            Log.d(TAG, "Asset path detected: $actualPath")
-            promise.resolve(null)
-            return@AsyncFunction
-          }
-        }
-        
-        // 验证文件是否存在
-        if (fileToCheck.exists() && fileToCheck.isFile) {
-          Log.d(TAG, "Model file verified: ${fileToCheck.absolutePath}")
-          promise.resolve(null)
-        } else {
-          val errorMsg = "Model file not found: ${fileToCheck.absolutePath}"
-          Log.e(TAG, errorMsg)
-          throw IOException(errorMsg)
-        }
-
-      } catch (e: Exception) {
-        Log.e(TAG, "Failed to preload model: ${e.message}")
-        promise.reject("MODEL_LOAD_ERROR", "Failed to preload model: ${e.message}", e)
-      }
-    }
-
     AsyncFunction("getAvailableModels") { promise: Promise ->
       try {
         Log.d(TAG, "Getting available models")

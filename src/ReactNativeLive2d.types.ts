@@ -76,12 +76,6 @@ export interface Live2DModule {
   initializeLive2D(): Promise<boolean>;
   
   /**
-   * 预加载模型资源
-   * @param modelPath 模型文件路径
-   */
-  preloadModel(modelPath: string): Promise<void>;
-  
-  /**
    * 释放模型资源
    * @param modelPath 模型文件路径
    */

@@ -56,9 +56,6 @@ export default function AdvancedExample() {
 
   const handleMotionChange = async (motionGroup: string) => {
     try {
-      // 预加载模型
-      await ReactNativeLive2dModule.preloadModel('models/Haru/Haru.model3.json');
-      
       // 获取可用动作
       const motions = await ReactNativeLive2dModule.getAvailableMotions('models/Haru/Haru.model3.json');
       console.log('可用动作:', motions);
@@ -105,7 +102,6 @@ export default function AdvancedExample() {
 
 | 方法 | 参数 | 返回值 | 描述 |
 |------|------|--------|------|
-| `preloadModel` | `modelPath: string` | `Promise<void>` | 预加载模型资源 |
 | `releaseModel` | `modelPath: string` | `Promise<void>` | 释放模型资源 |
 | `getAvailableMotions` | `modelPath: string` | `Promise<string[]>` | 获取可用动作列表 |
 | `getAvailableExpressions` | `modelPath: string` | `Promise<string[]>` | 获取可用表情列表 |

@@ -65,7 +65,7 @@ public class LAppLive2DManager {
 
         for (int i = 0; i < models.size(); i++) {
             LAppModel model = models.get(i);
-            LAppPal.printLog("onUpdate: Processing model " + i + ", getModel() result: " + (model.getModel() != null ? "not null" : "null"));
+            // LAppPal.printLog("onUpdate: Processing model " + i + ", getModel() result: " + (model.getModel() != null ? "not null" : "null"));
 
             if (model.getModel() == null) {
                 LAppPal.printLog("Failed to model.getModel() for model " + i + " - skipping render");
