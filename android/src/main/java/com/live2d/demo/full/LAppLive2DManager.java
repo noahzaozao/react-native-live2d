@@ -96,9 +96,10 @@ public class LAppLive2DManager {
                 // }
             }
             
-            // モデルを画面中央に配置し、適切なサイズに調整
-            projection.translateRelative(0.0f, 0.0f);
-            projection.scaleRelative(1.0f, 1.0f);
+            // モデルを画面中央に配置し、適切なサイズに調整（叠加用户位移）
+            projection.translateRelative(userOffsetX, userOffsetY);
+            // 叠加用户缩放比例
+            projection.scaleRelative(userScale, userScale);
 
             // if (DEBUG_LOG_ENABLE) {
             //     LAppPal.printLog("onUpdate: Projection matrix configured for model " + i);
@@ -114,6 +115,25 @@ public class LAppLive2DManager {
             // モデル1体描画後コール
             LAppDelegate.getInstance().getView().postModelDraw(model);
         }
+    }
+
+    /**
+     * 设置用户期望的等比缩放比例
+     */
+    public void setUserScale(float scale) {
+        if (scale <= 0.0f) {
+            return;
+        }
+        // 可根据需要做 clamp，这里保持直接赋值
+        userScale = scale;
+    }
+
+    /**
+     * 设置用户期望的模型位置偏移（逻辑坐标系，原点为中心，向右为正X，向上为正Y）。
+     */
+    public void setUserPosition(float x, float y) {
+        userOffsetX = x;
+        userOffsetY = y;
     }
 
     /**
@@ -312,4 +332,11 @@ public class LAppLive2DManager {
     // onUpdateメソッドで使用されるキャッシュ変数
     private final CubismMatrix44 viewMatrix = CubismMatrix44.create();
     private final CubismMatrix44 projection = CubismMatrix44.create();
+
+    // 由外部（如 RN 层）控制的缩放因子，默认 1.0
+    private float userScale = 1.0f;
+
+    // 由外部控制的位置偏移，默认居中 (0,0)
+    private float userOffsetX = 0.0f;
+    private float userOffsetY = 0.0f;
 }

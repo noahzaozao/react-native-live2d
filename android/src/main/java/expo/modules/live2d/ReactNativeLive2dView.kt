@@ -388,10 +388,17 @@ class ReactNativeLive2dView(context: Context, appContext: AppContext) : ExpoView
       val view = delegate.getView()
       
       if (view != null) {
-        // 这里需要根据实际的 LAppView API 来设置缩放
-        // 暂时记录日志
-        Log.d(TAG, "Scale setting: $scale")
+        // 在 GL 线程设置缩放
+        glSurfaceView.queueEvent {
+          try {
+            view.setViewScale(scale)
+          } catch (e: Exception) {
+            Log.e(TAG, "Error calling view.setViewScale: ${e.message}")
+          }
+        }
         glSurfaceView.requestRender()
+      } else {
+        Log.w(TAG, "LAppView is null when setting scale")
       }
     } catch (e: Exception) {
       Log.e(TAG, "Failed to set scale: ${e.message}")
@@ -414,10 +421,16 @@ class ReactNativeLive2dView(context: Context, appContext: AppContext) : ExpoView
       val view = delegate.getView()
       
       if (view != null) {
-        // 这里需要根据实际的 LAppView API 来设置位置
-        // 暂时记录日志
-        Log.d(TAG, "Position setting: ($x, $y)")
+        glSurfaceView.queueEvent {
+          try {
+            view.setViewPosition(x, y)
+          } catch (e: Exception) {
+            Log.e(TAG, "Error calling view.setViewPosition: ${e.message}")
+          }
+        }
         glSurfaceView.requestRender()
+      } else {
+        Log.w(TAG, "LAppView is null when setting position")
       }
     } catch (e: Exception) {
       Log.e(TAG, "Failed to set position: ${e.message}")

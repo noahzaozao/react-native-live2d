@@ -497,6 +497,26 @@ public class LAppView implements AutoCloseable {
         return renderingTarget;
     }
 
+    /**
+     * 设置视图缩放比例（等比缩放）。
+     * 注意：该缩放作用于 `viewMatrix`，用于控制模型整体显示缩放。
+     * 建议在 GL 线程调用，调用后需要请求重绘。
+     */
+    public void setViewScale(float scale) {
+        if (scale <= 0.0f) {
+            return;
+        }
+        // 由 Manager 负责在投影矩阵中叠加缩放
+        LAppLive2DManager.getInstance().setUserScale(scale);
+    }
+
+    /**
+     * 设置视图位置偏移（逻辑坐标系，以屏幕中心为原点，向右为正X，向上为正Y）。
+     */
+    public void setViewPosition(float x, float y) {
+        LAppLive2DManager.getInstance().setUserPosition(x, y);
+    }
+
     private final CubismMatrix44 deviceToScreen = CubismMatrix44.create(); // デバイス座標からスクリーン座標に変換するための行列
     private final CubismViewMatrix viewMatrix = new CubismViewMatrix();   // 画面表示の拡縮や移動の変換を行う行列
     private int windowWidth;
