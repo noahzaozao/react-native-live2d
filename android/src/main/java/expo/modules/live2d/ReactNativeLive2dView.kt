@@ -17,8 +17,10 @@ class ReactNativeLive2dView(context: Context, appContext: AppContext) : ExpoView
   private val container: FrameLayout = FrameLayout(context)
   private lateinit var glSurfaceView: GLSurfaceView
   private lateinit var renderer: GLRenderer
-  private var modelPath: String? = null
-  private var isInitialized = false
+  var modelPath: String? = null
+    private set
+  var isInitialized = false
+    private set
   private var isGLSetupComplete = false
 
   // Event dispatchers for each event type
@@ -74,12 +76,22 @@ class ReactNativeLive2dView(context: Context, appContext: AppContext) : ExpoView
     try {
       Log.d(TAG, "Setting up GLSurfaceView with basic configuration")
       
-      // 首先初始化Live2D，确保在GLSurfaceView生命周期开始前完成
-      initializeLive2D()
-      
       // 基本的 OpenGL ES 2.0 设置
       glSurfaceView.setEGLContextClientVersion(2)
       Log.d(TAG, "Set EGL context client version to 2")
+      
+      // 首先初始化Live2D，确保在GLSurfaceView生命周期开始前完成
+      initializeLive2D()
+      
+      // 验证初始化是否成功
+      if (!isInitialized) {
+        Log.e(TAG, "Live2D initialization failed, cannot setup GLSurfaceView")
+        dispatchEvent("onError", mapOf(
+          "error" to "GL_SETUP_ERROR",
+          "message" to "Live2D initialization failed"
+        ))
+        return
+      }
       
       // 设置渲染器
       glSurfaceView.setRenderer(renderer)
@@ -128,17 +140,39 @@ class ReactNativeLive2dView(context: Context, appContext: AppContext) : ExpoView
           return
         }
         
-        // 初始化 LAppDelegate
+        // 确保之前的实例被正确清理
         val delegate = LAppDelegate.getInstance()
+        Log.d(TAG, "Ensuring clean state before initialization")
+        
+        // 如果view存在但状态不正确，先清理
+        val currentView = delegate.getView()
+        if (currentView != null) {
+          Log.d(TAG, "Found existing view, cleaning up before reinitialization")
+          try {
+            delegate.onStop()
+          } catch (e: Exception) {
+            Log.w(TAG, "Error during cleanup: ${e.message}")
+          }
+        }
+        
         Log.d(TAG, "Calling delegate.onStart with activity: ${activity.javaClass.simpleName}")
         delegate.onStart(activity)
         
-        // 不要手动调用 onSurfaceCreated，让 GLSurfaceView 的渲染器自然调用
-        // 这确保 OpenGL 上下文已经完全准备就绪
-        Log.d(TAG, "LAppDelegate initialized, waiting for GLSurfaceView to call onSurfaceCreated")
+        // 验证view是否被正确创建
+        val newView = delegate.getView()
+        if (newView == null) {
+          Log.e(TAG, "View was not created after onStart")
+          dispatchEvent("onError", mapOf(
+            "error" to "INIT_ERROR",
+            "message" to "Failed to create LAppView"
+          ))
+          return
+        }
+        
+        Log.d(TAG, "LAppView created successfully, waiting for GLSurfaceView lifecycle")
         
         isInitialized = true
-        // Log.d(TAG, "Live2D initialized successfully")
+        Log.d(TAG, "Live2D initialization completed successfully")
       } catch (e: Exception) {
         Log.e(TAG, "Failed to initialize Live2D: ${e.message}", e)
         // 发送错误事件
@@ -163,6 +197,7 @@ class ReactNativeLive2dView(context: Context, appContext: AppContext) : ExpoView
 
   fun loadModel(modelPath: String) {
     Log.d(TAG, "Loading model: $modelPath")
+    Log.d(TAG, "loadModel called - isGLSetupComplete: $isGLSetupComplete, isInitialized: $isInitialized")
 
     if (!isGLSetupComplete) {
       Log.w(TAG, "GL components not ready, deferring model loading")
@@ -172,7 +207,11 @@ class ReactNativeLive2dView(context: Context, appContext: AppContext) : ExpoView
       return
     }
 
+    Log.d(TAG, "GL components ready, proceeding with model loading")
+
     try {
+      Log.d(TAG, "Starting model loading process")
+      
       // 处理路径格式，统一转换为文件系统绝对路径
       val fullPath = when {
         modelPath.startsWith("file://") -> modelPath.substring(7)
@@ -188,16 +227,20 @@ class ReactNativeLive2dView(context: Context, appContext: AppContext) : ExpoView
       Log.d(TAG, "Resolved model path: $fullPath")
 
       // 确保在 GL 线程加载模型与创建纹理
+      Log.d(TAG, "Queuing model loading on GL thread")
       glSurfaceView.queueEvent {
         try {
+          Log.d(TAG, "GL thread: Starting model loading")
           val manager = LAppLive2DManager.getInstance()
           loadModelFromFileSystem(fullPath, manager)
+          Log.d(TAG, "GL thread: Model loaded successfully, requesting render")
           glSurfaceView.requestRender()
           dispatchEvent("onModelLoaded", mapOf(
             "modelPath" to fullPath
           ))
+          Log.d(TAG, "GL thread: Model loading completed")
         } catch (e: Exception) {
-          Log.e(TAG, "Failed to load model on GL thread: ${e.message}")
+          Log.e(TAG, "Failed to load model on GL thread: ${e.message}", e)
           dispatchEvent("onError", mapOf(
             "error" to "MODEL_LOAD_ERROR",
             "message" to "Failed to load model: ${e.message}"
@@ -485,27 +528,71 @@ class ReactNativeLive2dView(context: Context, appContext: AppContext) : ExpoView
   override fun onAttachedToWindow() {
     super.onAttachedToWindow()
     Log.d(TAG, "View attached to window")
+    Log.d(TAG, "onAttachedToWindow called - starting initialization check")
     
     try {
+      // 如果之前被detach过，需要重新初始化
+      if (!isInitialized) {
+        Log.d(TAG, "Reinitializing Live2D after reattach")
+        try {
+          initializeLive2D()
+          Log.d(TAG, "Live2D reinitialization completed")
+        } catch (e: Exception) {
+          Log.e(TAG, "Failed to reinitialize Live2D: ${e.message}", e)
+        }
+      } else {
+        Log.d(TAG, "Live2D already initialized, skipping reinitialization")
+      }
+      
+      // 调试信息：检查状态
+      Log.d(TAG, "onAttachedToWindow - modelPath: $modelPath, isInitialized: $isInitialized")
+      
+      // 延迟重新加载模型，确保GLSurfaceView完全初始化
+      Log.d(TAG, "Scheduling delayed model reload check")
+      postDelayed({
+        try {
+          Log.d(TAG, "Delayed reload check - modelPath: $modelPath, isInitialized: $isInitialized")
+          
+          // 如果之前有模型路径，重新加载模型
+          if (modelPath != null && isInitialized) {
+            Log.d(TAG, "Reloading model after reattach: $modelPath")
+            loadModel(modelPath!!)
+          } else {
+            Log.w(TAG, "Cannot reload model - modelPath: $modelPath, isInitialized: $isInitialized")
+          }
+        } catch (e: Exception) {
+          Log.e(TAG, "Error in delayed reload check: ${e.message}", e)
+        }
+      }, 500) // 延迟500ms
+      
+      Log.d(TAG, "About to call glSurfaceView.onResume()")
       glSurfaceView.onResume()
+      Log.d(TAG, "glSurfaceView.onResume() completed")
     } catch (e: Exception) {
-      Log.e(TAG, "Failed to resume GLSurfaceView: ${e.message}")
+      Log.e(TAG, "Failed to resume GLSurfaceView: ${e.message}", e)
     }
   }
 
   override fun onDetachedFromWindow() {
     super.onDetachedFromWindow()
-    Log.d(TAG, "View detached from window")
+    Log.d(TAG, "View detached from window - modelPath: $modelPath, isInitialized: $isInitialized")
     
     try {
       glSurfaceView.onPause()
       
-      // 清理 Live2D 资源
+      // 清理 Live2D 资源，但不销毁单例
       if (isInitialized) {
         val delegate = LAppDelegate.getInstance()
+        Log.d(TAG, "Cleaning up Live2D resources on detach")
+        
+        // 只调用onStop来清理view，不调用onDestroy来保持单例
         delegate.onStop()
-        delegate.onDestroy()
+        
+        // 重置初始化状态，但不销毁delegate
         isInitialized = false
+        isGLSetupComplete = false
+        
+        Log.d(TAG, "Live2D resources cleaned up")
       }
     } catch (e: Exception) {
       Log.e(TAG, "Failed to cleanup: ${e.message}")

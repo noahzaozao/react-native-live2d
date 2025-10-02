@@ -30,6 +30,8 @@ class ReactNativeLive2dModule : Module() {
       
       Prop("modelPath") { view: ReactNativeLive2dView, path: String? -> 
         Log.d(TAG, "modelPath prop received: '$path'")
+        Log.d(TAG, "Current view state - isInitialized: ${view.isInitialized}, modelPath: ${view.modelPath}")
+        
         if (path != null && path.isNotEmpty()) {
           Log.d(TAG, "Calling view.loadModel with path: '$path'")
           view.loadModel(path) 

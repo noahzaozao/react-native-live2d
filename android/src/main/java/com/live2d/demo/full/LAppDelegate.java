@@ -55,6 +55,7 @@ public class LAppDelegate {
     public void onStop() {
         if (view != null) {
             view.close();
+            view = null;  // 显式设置为null，避免状态不一致
         }
         textureManager = null;
 

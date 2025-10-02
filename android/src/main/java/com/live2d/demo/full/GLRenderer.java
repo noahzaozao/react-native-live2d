@@ -29,9 +29,20 @@ public class GLRenderer implements GLSurfaceView.Renderer {
         try {
             LAppDelegate delegate = LAppDelegate.getInstance();
             if (delegate.getView() != null) {
+                android.util.Log.d("GLRenderer", "onSurfaceChanged: View exists, initializing with size " + width + "x" + height);
                 delegate.onSurfaceChanged(width, height);
             } else {
-                android.util.Log.w("GLRenderer", "LAppDelegate view is null, skipping onSurfaceChanged");
+                android.util.Log.w("GLRenderer", "LAppDelegate view is null, skipping onSurfaceChanged - this may happen during initialization");
+                // 延迟重试，给初始化更多时间
+                new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+                    LAppDelegate retryDelegate = LAppDelegate.getInstance();
+                    if (retryDelegate.getView() != null) {
+                        android.util.Log.d("GLRenderer", "Retry successful: View now exists, calling onSurfaceChanged");
+                        retryDelegate.onSurfaceChanged(width, height);
+                    } else {
+                        android.util.Log.w("GLRenderer", "Retry failed: View still null after delay");
+                    }
+                }, 100); // 延迟100ms重试
             }
         } catch (Exception e) {
             android.util.Log.e("GLRenderer", "Error in onSurfaceChanged: " + e.getMessage(), e);
