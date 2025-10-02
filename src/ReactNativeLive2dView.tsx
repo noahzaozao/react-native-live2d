@@ -26,7 +26,7 @@ export default function ReactNativeLive2dView(props: ReactNativeLive2DViewProps)
   }, [modelPath]);
 
   useEffect(() => {
-    console.log('[ReactNativeLive2dView] Props received:', {
+    console.log('[ReactNativeLive2dView] Props received:', JSON.stringify({
       modelPath,
       motionGroup,
       expression,
@@ -34,7 +34,7 @@ export default function ReactNativeLive2dView(props: ReactNativeLive2DViewProps)
       autoBlink,
       scale,
       position
-    });
+    }));
   }, [modelPath, motionGroup, expression, autoBreath, autoBlink, scale, position]);
 
   const handleTap = () => {

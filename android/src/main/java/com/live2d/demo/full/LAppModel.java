@@ -89,13 +89,13 @@ public class LAppModel extends CubismUserModel {
 
     public void loadAssetsFromFileSystem(final String filePath) {
         if (LAppDefine.DEBUG_LOG_ENABLE) {
-            LAppPal.printLog("load model setting from file system: " + filePath);
+            LAppPal.printLog("loadAssetsFromFileSystem: " + filePath);
         }
 
         // 从完整文件路径中提取目录和文件名
         int lastSlashIndex = filePath.lastIndexOf('/');
         if (lastSlashIndex == -1) {
-            LAppPal.printLog("Invalid file path: " + filePath);
+            LAppPal.printLog("loadAssetsFromFileSystem: Invalid file path: " + filePath);
             return;
         }
 
@@ -106,7 +106,7 @@ public class LAppModel extends CubismUserModel {
         byte[] buffer = createBufferFromFileSystem(filePath);
 
         if (buffer.length == 0) {
-            LAppPal.printLog("Failed to load model file: " + filePath);
+            LAppPal.printLog("loadAssetsFromFileSystem: Failed to load model file: " + filePath);
             return;
         }
 
@@ -116,7 +116,7 @@ public class LAppModel extends CubismUserModel {
         setupModelFromFileSystem(setting, modelHomeDirectory);
 
         if (model == null) {
-            LAppPal.printLog("Failed to loadAssetsFromFileSystem().");
+            LAppPal.printLog("loadAssetsFromFileSystem: Failed to loadAssetsFromFileSystem()");
             return;
         }
 
@@ -485,14 +485,14 @@ public class LAppModel extends CubismUserModel {
 
     private static byte[] createBufferFromFileSystem(final String path) {
         if (LAppDefine.DEBUG_LOG_ENABLE) {
-            LAppPal.printLog("create buffer from file system: " + path);
+            LAppPal.printLog("createBufferFromFileSystem: " + path);
         }
         return LAppPal.loadFileFromFileSystem(path);
     }
 
     // model3.jsonからモデルを生成する (from assets)
     private void setupModel(ICubismModelSetting setting) {
-        LAppPal.printLog("setupModel: Starting model setup");
+        LAppPal.printLog("setupModel");
         modelSetting = setting;
 
         isUpdated = true;
@@ -656,7 +656,7 @@ public class LAppModel extends CubismUserModel {
                 String path = modelHomeDirectory + fileName;
 
                 if (LAppDefine.DEBUG_LOG_ENABLE) {
-                    LAppPal.printLog("create model from file system: " + modelSetting.getModelFileName());
+                    LAppPal.printLog("setupModelFromFileSystem: " + modelSetting.getModelFileName());
                 }
 
                 byte[] buffer = createBufferFromFileSystem(path);
@@ -961,7 +961,7 @@ public class LAppModel extends CubismUserModel {
                 String modelPath = modelHomeDirectory + path;
 
                 if (debugMode) {
-                    LAppPal.printLog("load motion from file system: " + path + "==>[" + group + "_" + i + "]");
+                    LAppPal.printLog("preLoadMotionGroupFromFileSystem: " + path + "==>[" + group + "_" + i + "]");
                 }
 
                 byte[] buffer;

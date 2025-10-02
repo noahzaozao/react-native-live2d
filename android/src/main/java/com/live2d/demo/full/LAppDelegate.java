@@ -73,11 +73,13 @@ public class LAppDelegate {
         // テクスチャサンプリング設定
         GLES20.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         GLES20.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+
         android.util.Log.d("LAppDelegate", "onSurfaceCreated: Texture parameters set");
 
         // 透過設定
         GLES20.glEnable(GLES20.GL_BLEND);
         GLES20.glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+
         android.util.Log.d("LAppDelegate", "onSurfaceCreated: Blend mode set to GL_ONE, GL_ONE_MINUS_SRC_ALPHA");
 
         // Check OpenGL errors
@@ -88,19 +90,31 @@ public class LAppDelegate {
 
         // Initialize Cubism SDK framework
         CubismFramework.initialize();
+
         android.util.Log.d("LAppDelegate", "onSurfaceCreated: CubismFramework initialized");
     }
 
     public void onSurfaceChanged(int width, int height) {
+        
+        android.util.Log.d("LAppDelegate", "onSurfaceChanged: Starting OpenGL initialization");
+
         // 描画範囲指定
         GLES20.glViewport(0, 0, width, height);
+
+        android.util.Log.d("LAppDelegate", "onSurfaceChanged: glViewport set to " + width + "x" + height);
+
         windowWidth = width;
         windowHeight = height;
 
         // AppViewの初期化 - 添加空指针检查
         if (view != null) {
+            
+            android.util.Log.d("LAppDelegate", "onSurfaceChanged: view is not null, initializing");
+
             view.initialize();
+            
             view.initializeSprite();
+
         } else {
             android.util.Log.e("LAppDelegate", "view is null in onSurfaceChanged, cannot initialize");
             return;

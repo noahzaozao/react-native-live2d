@@ -47,11 +47,7 @@ public class LAppLive2DManager {
      * 初始化模型管理器（移除assets扫描逻辑，统一使用文件系统路径）
      */
     public void setUpModel() {
-        // 清空模型目录列表，不再从assets扫描模型
-        modelDir.clear();
-        if (DEBUG_LOG_ENABLE) {
-            LAppPal.printLog("setUpModel: Assets scanning removed, using file system paths only");
-        }
+        LAppPal.printLog("LAppLive2DManager setUpModel (empty function)");
     }
 
     // モデル更新処理及び描画処理を行う
@@ -311,10 +307,7 @@ public class LAppLive2DManager {
     private static LAppLive2DManager s_instance;
 
     private LAppLive2DManager() {
-        setUpModel();
-        if (DEBUG_LOG_ENABLE) {
-            LAppPal.printLog("LAppLive2DManager initialized - models will be loaded via file system paths only");
-        }
+        LAppPal.printLog("LAppLive2DManager constructor (empty function)");
     }
 
     private final List<LAppModel> models = new ArrayList<>();

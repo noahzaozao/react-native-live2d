@@ -137,7 +137,7 @@ public class LAppPal {
     private static long _lastNanoTime = getSystemNanoTime();
     private static long _deltaNanoTime = 0L;
 
-    private static final String TAG = "SampleApp";
+    private static final String TAG = "Live2DDemoApp";
 
     private LAppPal() {}
 }

@@ -90,7 +90,7 @@ public class LAppTextureManager {
         bitmap = null;
 
         if (LAppDefine.DEBUG_LOG_ENABLE) {
-            CubismFramework.coreLogFunction("Create texture: " + filePath);
+            CubismFramework.coreLogFunction("createTextureFromPngFile: Create texture: " + filePath);
         }
 
         return textureInfo;
@@ -146,7 +146,7 @@ public class LAppTextureManager {
 
         if (bitmap == null) {
             if (LAppDefine.DEBUG_LOG_ENABLE) {
-                LAppPal.printLog("Failed to decode bitmap from: " + filePath);
+                LAppPal.printLog("createTextureFromFileSystem: Failed to decode bitmap from: " + filePath);
             }
             return null;
         }
@@ -183,7 +183,7 @@ public class LAppTextureManager {
         bitmap = null;
 
         if (LAppDefine.DEBUG_LOG_ENABLE) {
-            LAppPal.printLog("Create texture from file system: " + filePath);
+            LAppPal.printLog("createTextureFromFileSystem: Create texture from file system: " + filePath);
         }
 
         return textureInfo;

@@ -33,11 +33,17 @@ class ReactNativeLive2dModule : Module() {
         Log.d(TAG, "Current view state - isInitialized: ${view.isInitialized}, modelPath: ${view.modelPath}")
         
         if (path != null && path.isNotEmpty()) {
+          
           Log.d(TAG, "Calling view.loadModel with path: '$path'")
+          
           view.loadModel(path) 
+          
           Log.d(TAG, "view.loadModel call completed for path: '$path'")
+
         } else {
+          
           Log.d(TAG, "modelPath is null or empty, skipping model loading")
+          
         }
       }
       
