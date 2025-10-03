@@ -50,6 +50,8 @@ android {
   }
   packagingOptions {
     pickFirst "lib/**/libc++_shared.so"
+    pickFirst "lib/**/libjsc.so"
+    pickFirst "lib/**/libhermes.so"
   }
 }
 

@@ -5,9 +5,9 @@ import expo.modules.kotlin.modules.ModuleDefinition
 import expo.modules.kotlin.Promise
 import android.content.Context
 import android.util.Log
-import com.live2d.demo.full.LAppDelegate
-import com.live2d.demo.full.LAppLive2DManager
-import com.live2d.demo.full.LAppModel
+import com.live2d.kotlin.LAppDelegate
+import com.live2d.kotlin.LAppLive2DManager
+import com.live2d.kotlin.LAppModel
 import java.io.IOException
 import java.io.File
 import java.net.URI

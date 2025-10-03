@@ -1,0 +1,333 @@
+/*
+ * Copyright(c) Live2D Inc. All rights reserved.
+ *
+ * Use of this source code is governed by the Live2D Open Software license
+ * that can be found at http://live2d.com/eula/live2d-open-software-license-agreement_en.html.
+ */
+
+package com.live2d.kotlin
+
+import com.live2d.kotlin.LAppDefine
+import com.live2d.kotlin.LAppPal
+import com.live2d.kotlin.LAppDelegate
+import com.live2d.kotlin.LAppModel
+import com.live2d.sdk.cubism.framework.math.CubismMatrix44
+import com.live2d.sdk.cubism.framework.motion.ACubismMotion
+import com.live2d.sdk.cubism.framework.motion.IBeganMotionCallback
+import com.live2d.sdk.cubism.framework.motion.IFinishedMotionCallback
+
+/**
+ * サンプルアプリケーションにおいてCubismModelを管理するクラス。
+ * モデル生成と破棄、タップイベントの処理、モデル切り替えを行う。
+ */
+class LAppLive2DManager private constructor() {
+    
+    private val models: MutableList<LAppModel> = ArrayList()
+
+    /**
+     * 表示するシーンのインデックス値
+     */
+    private var currentModel: Int = 0
+
+    /**
+     * モデルディレクトリ名
+     */
+    private val modelDir: MutableList<String> = ArrayList()
+
+    // onUpdateメソッドで使用されるキャッシュ変数
+    private val viewMatrix = CubismMatrix44.create()
+    private val projection = CubismMatrix44.create()
+
+    // 由外部（如 RN 层）控制的缩放因子，默认 1.0
+    private var userScale: Float = 1.0f
+
+    // 由外部控制的位置偏移，默认居中 (0,0)
+    private var userOffsetX: Float = 0.0f
+    private var userOffsetY: Float = 0.0f
+
+    init {
+        LAppPal.printLog("LAppLive2DManager constructor (empty function)")
+    }
+
+    /**
+     * 現在のシーンで保持している全てのモデルを解放する
+     */
+    fun releaseAllModel() {
+        for (model in models) {
+            model.deleteModel()
+        }
+        models.clear()
+    }
+
+    /**
+     * 初始化模型管理器（移除assets扫描逻辑，统一使用文件系统路径）
+     */
+    fun setUpModel() {
+        LAppPal.printLog("LAppLive2DManager setUpModel (empty function)")
+    }
+
+    // モデル更新処理及び描画処理を行う
+    fun onUpdate() {
+        val width = LAppDelegate.getInstance().windowWidth
+        val height = LAppDelegate.getInstance().windowHeight
+
+        // if (DEBUG_LOG_ENABLE) {
+        //     LAppPal.printLog("onUpdate: Total models: " + models.size() + ", Window size: " + width + "x" + height);
+        // }
+
+        for (i in models.indices) {
+            val model = models[i]
+            // LAppPal.printLog("onUpdate: Processing model " + i + ", getModel() result: " + (model.getModel() != null ? "not null" : "null"));
+
+            if (model.model == null) {
+                LAppPal.printLog("Failed to model.getModel() for model $i - skipping render")
+                continue
+            }
+
+            // 投影矩阵を初期化
+            projection.loadIdentity()
+
+            // 画面比率を考慮した投影矩阵を設定
+            val aspectRatio = width.toFloat() / height.toFloat()
+
+            // if (DEBUG_LOG_ENABLE) {
+            //     LAppPal.printLog("onUpdate: Model " + i + " - Screen: " + width + "x" + height + ", aspect ratio: " + aspectRatio);
+            // }
+
+            if (aspectRatio > 1.0f) {
+                // 横長画面の場合
+                projection.scale(1.0f / aspectRatio, 1.0f)
+                // if (DEBUG_LOG_ENABLE) {
+                //     LAppPal.printLog("onUpdate: Landscape mode - scaling by (1/" + aspectRatio + ", 1.0)");
+                // }
+            } else {
+                // 縦長画面の場合
+                projection.scale(1.0f, aspectRatio)
+                // if (DEBUG_LOG_ENABLE) {
+                //     LAppPal.printLog("onUpdate: Portrait mode - scaling by (1.0, " + aspectRatio + ")");
+                // }
+            }
+
+            // モデルを画面中央に配置し、適切なサイズに調整（叠加用户位移）
+            projection.translateRelative(userOffsetX, userOffsetY)
+            // 叠加用户缩放比例
+            projection.scaleRelative(userScale, userScale)
+
+            // if (DEBUG_LOG_ENABLE) {
+            //     LAppPal.printLog("onUpdate: Projection matrix configured for model " + i);
+            // }
+
+            // モデル1体描画前コール
+            LAppDelegate.getInstance().view?.preModelDraw(model)
+
+            model.update()
+
+            model.draw(projection)     // 参照渡しなのでprojectionは変質する
+
+            // モデル1体描画後コール
+            LAppDelegate.getInstance().view?.postModelDraw(model)
+        }
+    }
+
+    /**
+     * 设置用户期望的等比缩放比例
+     */
+    fun setUserScale(scale: Float) {
+        if (scale <= 0.0f) {
+            return
+        }
+        // 可根据需要做 clamp，这里保持直接赋值
+        userScale = scale
+    }
+
+    /**
+     * 设置用户期望的模型位置偏移（逻辑坐标系，原点为中心，向右为正X，向上为正Y）。
+     */
+    fun setUserPosition(x: Float, y: Float) {
+        userOffsetX = x
+        userOffsetY = y
+    }
+
+    /**
+     * 画面をドラッグした時の処理
+     *
+     * @param x 画面のx座標
+     * @param y 画面のy座標
+     */
+    fun onDrag(x: Float, y: Float) {
+        for (i in models.indices) {
+            val model = getModel(i)
+            model?.setDragging(x, y)
+        }
+    }
+
+    /**
+     * 画面をタップした時の処理
+     *
+     * @param x 画面のx座標
+     * @param y 画面のy座標
+     */
+    fun onTap(x: Float, y: Float) {
+        if (LAppDefine.DEBUG_LOG_ENABLE) {
+            LAppPal.printLog("tap point: {$x, y: $y")
+        }
+
+        for (i in models.indices) {
+            val model = models[i]
+
+            // 頭をタップした場合表情をランダムで再生する
+            if (model.hitTest(LAppDefine.HitAreaName.HEAD.id, x, y)) {
+                if (LAppDefine.DEBUG_LOG_ENABLE) {
+                    LAppPal.printLog("hit area: ${LAppDefine.HitAreaName.HEAD.id}")
+                }
+                model.setRandomExpression()
+            }
+            // 体をタップした場合ランダムモーションを開始する
+            else if (model.hitTest(LAppDefine.HitAreaName.BODY.id, x, y)) {
+                if (LAppDefine.DEBUG_LOG_ENABLE) {
+                    LAppPal.printLog("hit area: ${LAppDefine.HitAreaName.HEAD.id}")
+                }
+
+                model.startRandomMotion(LAppDefine.MotionGroup.TAP_BODY.id, LAppDefine.Priority.NORMAL.priority, finishedMotion, beganMotion)
+            }
+        }
+    }
+
+    /**
+     * 次のシーンに切り替える（已弃用 - 现在统一使用文件系统路径）
+     */
+    @Deprecated("Use file system paths with addModel() instead")
+    fun nextScene() {
+        if (LAppDefine.DEBUG_LOG_ENABLE) {
+            LAppPal.printLog("nextScene: This method is deprecated. Use file system paths with addModel() instead.")
+        }
+        // 不再支持场景切换，因为不再使用assets模型列表
+        LAppPal.printLog("nextScene: Scene switching is no longer supported. Please use file system paths.")
+    }
+
+    /**
+     * シーンを切り替える（已弃用 - 现在统一使用文件系统路径）
+     */
+    @Deprecated("Use file system paths with addModel() instead")
+    fun changeScene(index: Int) {
+        if (LAppDefine.DEBUG_LOG_ENABLE) {
+            LAppPal.printLog("changeScene: This method is deprecated. Use file system paths with addModel() instead.")
+            // 打印调用栈来追踪changeScene调用来源
+            val stackTrace = Thread.currentThread().stackTrace
+            for (i in 0 until minOf(5, stackTrace.size)) {
+                LAppPal.printLog("changeScene: Stack[$i]: ${stackTrace[i]}")
+            }
+        }
+
+        // 不再支持从assets加载模型，直接返回
+        LAppPal.printLog("changeScene: Assets loading is no longer supported. Please use file system paths.")
+    }
+
+    /**
+     * 現在のシーンで保持しているモデルを返す
+     *
+     * @param number モデルリストのインデックス値
+     * @return モデルのインスタンスを返す。インデックス値が範囲外の場合はnullを返す
+     */
+    fun getModel(number: Int): LAppModel? {
+        return if (number < models.size) {
+            models[number]
+        } else {
+            null
+        }
+    }
+
+    /**
+     * 現在のシーンで保持しているモデル数を返す
+     *
+     * @return モデル数
+     */
+    fun getModelNum(): Int {
+        return models.size
+    }
+
+    /**
+     * シーンインデックスを返す
+     *
+     * @return シーンインデックス
+     */
+    fun getCurrentModel(): Int {
+        return currentModel
+    }
+
+
+    /**
+     * Add a model to the manager
+     *
+     * @param model The model to add
+     */
+    fun addModel(model: LAppModel) {
+        if (LAppDefine.DEBUG_LOG_ENABLE) {
+            LAppPal.printLog("addModel: Starting - Thread: ${Thread.currentThread().name}")
+            LAppPal.printLog("addModel: Model parameter: ${if (model != null) "not null" else "null"}")
+            LAppPal.printLog("addModel: Models list: not null")
+            LAppPal.printLog("addModel: Adding model, current count: ${models.size}")
+            // 打印调用栈来追踪模型创建来源
+            val stackTrace = Thread.currentThread().stackTrace
+            for (i in 0 until minOf(5, stackTrace.size)) {
+                LAppPal.printLog("addModel: Stack[$i]: ${stackTrace[i]}")
+            }
+        }
+
+        try {
+            if (LAppDefine.DEBUG_LOG_ENABLE) {
+                LAppPal.printLog("addModel: About to add model to list")
+            }
+            models.add(model)
+            if (LAppDefine.DEBUG_LOG_ENABLE) {
+                LAppPal.printLog("addModel: Model added successfully, new count: ${models.size}")
+                LAppPal.printLog("addModel: Completed successfully")
+            }
+        } catch (e: Exception) {
+            if (LAppDefine.DEBUG_LOG_ENABLE) {
+                LAppPal.printLog("addModel: Exception occurred while adding model: ${e.message}")
+                e.printStackTrace()
+            }
+            throw e // 重新抛出异常
+        }
+    }
+
+    /**
+     * モーション再生時に実行されるコールバック関数
+     */
+    private class BeganMotion : IBeganMotionCallback {
+        override fun execute(motion: ACubismMotion) {
+            LAppPal.printLog("Motion Began: $motion")
+        }
+    }
+
+    /**
+     * モーション終了時に実行されるコールバック関数
+     */
+    private class FinishedMotion : IFinishedMotionCallback {
+        override fun execute(motion: ACubismMotion) {
+            LAppPal.printLog("Motion Finished: $motion")
+        }
+    }
+
+    companion object {
+        private val beganMotion = BeganMotion()
+        private val finishedMotion = FinishedMotion()
+
+        /**
+         * シングルトンインスタンス
+         */
+        private var s_instance: LAppLive2DManager? = null
+
+        fun getInstance(): LAppLive2DManager {
+            if (s_instance == null) {
+                s_instance = LAppLive2DManager()
+            }
+            return s_instance!!
+        }
+
+        fun releaseInstance() {
+            s_instance = null
+        }
+    }
+}

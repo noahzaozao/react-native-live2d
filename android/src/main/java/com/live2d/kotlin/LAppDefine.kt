@@ -5,18 +5,18 @@
  * that can be found at http://live2d.com/eula/live2d-open-software-license-agreement_en.html.
  */
 
-package com.live2d.demo;
+package com.live2d.kotlin
 
-import com.live2d.sdk.cubism.framework.CubismFrameworkConfig.LogLevel;
+import com.live2d.sdk.cubism.framework.CubismFrameworkConfig.LogLevel
 
 /**
  * Constants used in this sample app.
  */
-public class LAppDefine {
+object LAppDefine {
     /**
      * Scaling rate.
      */
-    public enum Scale {
+    enum class Scale(val value: Float) {
         /**
          * Default scaling rate
          */
@@ -28,23 +28,13 @@ public class LAppDefine {
         /**
          * Minimum scaling rate
          */
-        MIN(0.8f);
-
-        private final float value;
-
-        Scale(float value) {
-            this.value = value;
-        }
-
-        public float getValue() {
-            return value;
-        }
+        MIN(0.8f)
     }
 
     /**
      * Logical view coordinate system.
      */
-    public enum LogicalView {
+    enum class LogicalView(val value: Float) {
         /**
          * Left end
          */
@@ -60,23 +50,13 @@ public class LAppDefine {
         /**
          * Top end
          */
-        TOP(1.0f);
-
-        private final float value;
-
-        LogicalView(float value) {
-            this.value = value;
-        }
-
-        public float getValue() {
-            return value;
-        }
+        TOP(1.0f)
     }
 
     /**
      * Maximum logical view coordinate system.
      */
-    public enum MaxLogicalView {
+    enum class MaxLogicalView(val value: Float) {
         /**
          * Maximum left end
          */
@@ -92,23 +72,13 @@ public class LAppDefine {
         /**
          * Maximum top end
          */
-        TOP(2.0f);
-
-        private final float value;
-
-        MaxLogicalView(float value) {
-            this.value = value;
-        }
-
-        public float getValue() {
-            return value;
-        }
+        TOP(2.0f)
     }
 
     /**
      * Path of image materials.
      */
-    public enum ResourcePath {
+    enum class ResourcePath(val path: String) {
         /**
          * Relative path of the material directory
          */
@@ -136,23 +106,13 @@ public class LAppDefine {
         /**
          * Fragment shader file
          */
-        FRAG_SHADER("FragSprite.frag");
-
-        private final String path;
-
-        ResourcePath(String path) {
-            this.path = path;
-        }
-
-        public String getPath() {
-            return path;
-        }
+        FRAG_SHADER("FragSprite.frag")
     }
 
     /**
      * Motion group
      */
-    public enum MotionGroup {
+    enum class MotionGroup(val id: String) {
         /**
          * ID of the motion to be played at idling.
          */
@@ -160,86 +120,57 @@ public class LAppDefine {
         /**
          * ID of the motion to be played at tapping body.
          */
-        TAP_BODY("TapBody");
-
-        private final String id;
-
-        MotionGroup(String id) {
-            this.id = id;
-        }
-
-        public String getId() {
-            return id;
-        }
+        TAP_BODY("TapBody")
     }
 
     /**
      * [Head] tag for hit detection.
      * (Match with external definition file(json))
      */
-    public enum HitAreaName {
+    enum class HitAreaName(val id: String) {
         HEAD("Head"),
-        BODY("Body");
-
-        private final String id;
-
-        HitAreaName(String id) {
-            this.id = id;
-        }
-
-        public String getId() {
-            return id;
-        }
+        BODY("Body")
     }
 
     /**
      * Motion priority
      */
-    public enum Priority {
+    enum class Priority(val priority: Int) {
         NONE(0),
         IDLE(1),
         NORMAL(2),
-        FORCE(3);
-
-        private final int priority;
-
-        Priority(int priority) {
-            this.priority = priority;
-        }
-
-        public int getPriority() {
-            return priority;
-        }
+        FORCE(3)
     }
 
     /**
      * MOC3の整合性を検証するかどうか。有効ならtrue。
      */
-    public static final boolean MOC_CONSISTENCY_VALIDATION_ENABLE = true;
+    const val MOC_CONSISTENCY_VALIDATION_ENABLE = true
 
     /**
      * motion3.jsonの整合性を検証するかどうか。有効ならtrue。
      */
-    public static final boolean MOTION_CONSISTENCY_VALIDATION_ENABLE = true;
+    const val MOTION_CONSISTENCY_VALIDATION_ENABLE = true
 
     /**
      * Enable/Disable debug logging.
      */
-    public static final boolean DEBUG_LOG_ENABLE = true;
+    const val DEBUG_LOG_ENABLE = true
+    
     /**
      * Enable/Disable debug logging for processing tapping information.
      */
-    public static final boolean DEBUG_TOUCH_LOG_ENABLE = true;
+    const val DEBUG_TOUCH_LOG_ENABLE = true
+    
     /**
      * Setting the level of the log output from the Framework.
      */
-    public static final LogLevel cubismLoggingLevel = LogLevel.VERBOSE;
+    val cubismLoggingLevel = LogLevel.VERBOSE
+    
     /**
      * Enable/Disable premultiplied alpha.
      * Set to false because BitmapFactory.decodeStream() already loads textures as premultiplied alpha.
      * Setting this to true would cause double premultiplied alpha processing, resulting in black shadows.
      */
-    public static final boolean PREMULTIPLIED_ALPHA_ENABLE = true;
-
-
+    const val PREMULTIPLIED_ALPHA_ENABLE = true
 }

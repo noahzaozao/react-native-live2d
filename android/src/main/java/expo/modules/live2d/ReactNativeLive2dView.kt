@@ -8,10 +8,10 @@ import android.widget.FrameLayout
 import expo.modules.kotlin.AppContext
 import expo.modules.kotlin.views.ExpoView
 import expo.modules.kotlin.viewevent.EventDispatcher
-import com.live2d.demo.full.LAppDelegate
-import com.live2d.demo.full.LAppLive2DManager
-import com.live2d.demo.full.LAppModel
-import com.live2d.demo.full.GLRenderer
+import com.live2d.kotlin.LAppDelegate
+import com.live2d.kotlin.LAppLive2DManager
+import com.live2d.kotlin.LAppModel
+import com.live2d.kotlin.GLRenderer
 
 class ReactNativeLive2dView(context: Context, appContext: AppContext) : ExpoView(context, appContext) {
   private val container: FrameLayout = FrameLayout(context)
@@ -294,6 +294,39 @@ class ReactNativeLive2dView(context: Context, appContext: AppContext) : ExpoView
     
     Log.d(TAG, "loadModelFromFileSystem: file exists, size: ${file.length()} bytes")
     
+    // 检查CubismFramework是否已初始化
+    try {
+      val idManager = com.live2d.sdk.cubism.framework.CubismFramework.getIdManager()
+      if (idManager == null) {
+        Log.e(TAG, "loadModelFromFileSystem: CubismFramework not properly initialized")
+        dispatchEvent("onError", mapOf(
+          "error" to "FRAMEWORK_NOT_INITIALIZED",
+          "message" to "CubismFramework not properly initialized"
+        ))
+        return
+      }
+      Log.d(TAG, "loadModelFromFileSystem: CubismFramework is properly initialized")
+    } catch (e: Exception) {
+      Log.e(TAG, "loadModelFromFileSystem: Error checking CubismFramework initialization: ${e.message}")
+      dispatchEvent("onError", mapOf(
+        "error" to "FRAMEWORK_CHECK_ERROR",
+        "message" to "Error checking CubismFramework initialization: ${e.message}"
+      ))
+      return
+    }
+    
+    // Check textureManager availability
+    val textureManager = LAppDelegate.getInstance().getTextureManager()
+    if (textureManager == null) {
+      Log.e(TAG, "loadModelFromFileSystem: textureManager is null, cannot load model")
+      dispatchEvent("onError", mapOf(
+        "error" to "TEXTURE_MANAGER_NOT_AVAILABLE",
+        "message" to "textureManager is null, cannot load model"
+      ))
+      return
+    }
+    Log.d(TAG, "loadModelFromFileSystem: textureManager is available")
+    
     // 彻底清除现有模型 - 多次调用确保清理完成
     Log.d(TAG, "loadModelFromFileSystem: before manager.releaseAllModel: ${manager.getModelNum()} models)")
 
@@ -333,6 +366,27 @@ class ReactNativeLive2dView(context: Context, appContext: AppContext) : ExpoView
     manager.addModel(model)
     
     Log.d(TAG, "loadModelFromFileSystem: after manager.addModel: ${manager.getModelNum()} models")
+    
+    // 尝试绑定延迟的纹理
+    model.bindPendingTextures()
+    
+    // 延迟检查渲染器可用性，因为渲染器可能在模型添加到管理器后才初始化
+    glSurfaceView.queueEvent {
+      try {
+        // 等待一小段时间让渲染器初始化
+        Thread.sleep(100)
+        
+        // 检查渲染器是否现在可用
+        if (model.checkRendererAvailability()) {
+          Log.d(TAG, "loadModelFromFileSystem: Renderer is now available, binding pending textures")
+          model.bindPendingTextures()
+        } else {
+          Log.w(TAG, "loadModelFromFileSystem: Renderer is still not available after delay")
+        }
+      } catch (e: Exception) {
+        Log.e(TAG, "loadModelFromFileSystem: Error checking renderer availability: ${e.message}")
+      }
+    }
   }
 
   fun startMotion(motionGroup: String, motionIndex: Int) {
