@@ -144,22 +144,40 @@ class ReactNativeLive2dView(context: Context, appContext: AppContext) : ExpoView
         val delegate = LAppDelegate.getInstance()
         Log.d(TAG, "initializeLive2D LAppDelegate.getInstance")
         
-        // 如果view存在但状态不正确，先清理
+        // 检查是否需要重新初始化
         val currentView = delegate.getView()
-        if (currentView != null) {
-          Log.d(TAG, "initializeLive2D currentView from delegate.getView success")
-          try {
-            delegate.onStop()
-          } catch (e: Exception) {
-            Log.w(TAG, "initializeLive2D delegate.onStop failed: ${e.message}")
+        val textureManager = delegate.getTextureManager()
+        val currentActivity = delegate.getActivity()
+        
+        Log.d(TAG, "initializeLive2D state check - currentView: ${currentView != null}, textureManager: ${textureManager != null}, activity: ${currentActivity != null}")
+        
+        // 检查是否需要重新初始化
+        val needsReinitialization = currentView == null || textureManager == null || currentActivity != activity
+        
+        if (needsReinitialization) {
+          Log.d(TAG, "initializeLive2D need reinitialization - currentView: ${currentView != null}, textureManager: ${textureManager != null}, activityMatch: ${currentActivity == activity}")
+          
+          // 如果已经有view，先清理
+          if (currentView != null) {
+            try {
+              delegate.onStop()
+            } catch (e: Exception) {
+              Log.w(TAG, "initializeLive2D delegate.onStop failed: ${e.message}")
+            }
           }
+        } else {
+          Log.d(TAG, "initializeLive2D already initialized and activity matches, skipping reinitialization")
+          isInitialized = true
+          return
         }
         
         Log.d(TAG, "initializeLive2D delegate.onStart activity: ${activity.javaClass.simpleName}")
         delegate.onStart(activity)
         
-        // 验证view是否被正确创建
+        // 验证view和textureManager是否被正确创建
         val newView = delegate.getView()
+        val newTextureManager = delegate.getTextureManager()
+        
         if (newView == null) {
           Log.e(TAG, "initializeLive2D delegate.getView newView is null")
           dispatchEvent("onError", mapOf(
@@ -169,7 +187,16 @@ class ReactNativeLive2dView(context: Context, appContext: AppContext) : ExpoView
           return
         }
         
-        Log.d(TAG, "initializeLive2D delegate.getView success")
+        if (newTextureManager == null) {
+          Log.e(TAG, "initializeLive2D delegate.getTextureManager newTextureManager is null")
+          dispatchEvent("onError", mapOf(
+            "error" to "INIT_ERROR",
+            "message" to "initializeLive2D delegate.getTextureManager newTextureManager is null"
+          ))
+          return
+        }
+        
+        Log.d(TAG, "initializeLive2D delegate.getView and getTextureManager success")
         
         isInitialized = true
 
@@ -315,17 +342,48 @@ class ReactNativeLive2dView(context: Context, appContext: AppContext) : ExpoView
       return
     }
     
-    // Check textureManager availability
-    val textureManager = LAppDelegate.getInstance().getTextureManager()
+    // Check textureManager availability and try to reinitialize if needed
+    var textureManager = LAppDelegate.getInstance().getTextureManager()
     if (textureManager == null) {
-      Log.e(TAG, "loadModelFromFileSystem: textureManager is null, cannot load model")
-      dispatchEvent("onError", mapOf(
-        "error" to "TEXTURE_MANAGER_NOT_AVAILABLE",
-        "message" to "textureManager is null, cannot load model"
-      ))
-      return
+      Log.w(TAG, "loadModelFromFileSystem: textureManager is null, attempting to reinitialize")
+      
+      // 尝试重新初始化
+      try {
+        val activity = getActivity()
+        if (activity != null) {
+          val delegate = LAppDelegate.getInstance()
+          delegate.onStart(activity)
+          textureManager = delegate.getTextureManager()
+          
+          if (textureManager != null) {
+            Log.d(TAG, "loadModelFromFileSystem: textureManager reinitialized successfully")
+          } else {
+            Log.e(TAG, "loadModelFromFileSystem: textureManager still null after reinitialization")
+            dispatchEvent("onError", mapOf(
+              "error" to "TEXTURE_MANAGER_INIT_FAILED",
+              "message" to "textureManager initialization failed"
+            ))
+            return
+          }
+        } else {
+          Log.e(TAG, "loadModelFromFileSystem: cannot reinitialize - activity is null")
+          dispatchEvent("onError", mapOf(
+            "error" to "ACTIVITY_NOT_AVAILABLE",
+            "message" to "Activity not available for reinitialization"
+          ))
+          return
+        }
+      } catch (e: Exception) {
+        Log.e(TAG, "loadModelFromFileSystem: failed to reinitialize textureManager: ${e.message}")
+        dispatchEvent("onError", mapOf(
+          "error" to "TEXTURE_MANAGER_REINIT_ERROR",
+          "message" to "Failed to reinitialize textureManager: ${e.message}"
+        ))
+        return
+      }
+    } else {
+      Log.d(TAG, "loadModelFromFileSystem: textureManager is available")
     }
-    Log.d(TAG, "loadModelFromFileSystem: textureManager is available")
     
     // 彻底清除现有模型 - 多次调用确保清理完成
     Log.d(TAG, "loadModelFromFileSystem: before manager.releaseAllModel: ${manager.getModelNum()} models)")
@@ -625,11 +683,26 @@ class ReactNativeLive2dView(context: Context, appContext: AppContext) : ExpoView
           Log.d(TAG, "onAttachedToWindow postDelayed - modelPath: $modelPath, isInitialized: $isInitialized")
           
           // 如果之前有模型路径，重新加载模型
-          if (modelPath != null && isInitialized) {
-            Log.d(TAG, "onAttachedToWindow postDelayed before loadModel: $modelPath")
-            loadModel(modelPath!!)
+          if (modelPath != null) {
+            // 重新检查初始化状态，如果未初始化则尝试初始化
+            if (!isInitialized) {
+              Log.d(TAG, "onAttachedToWindow postDelayed isInitialized is false, attempting to initialize")
+              try {
+                initializeLive2D()
+              } catch (e: Exception) {
+                Log.e(TAG, "onAttachedToWindow postDelayed initializeLive2D failed: ${e.message}", e)
+              }
+            }
+            
+            // 再次检查初始化状态
+            if (isInitialized) {
+              Log.d(TAG, "onAttachedToWindow postDelayed before loadModel: $modelPath")
+              loadModel(modelPath!!)
+            } else {
+              Log.w(TAG, "onAttachedToWindow postDelayed still not initialized after retry")
+            }
           } else {
-            Log.w(TAG, "onAttachedToWindow postDelayed modelPath is null or isInitialized is false")
+            Log.w(TAG, "onAttachedToWindow postDelayed modelPath is null")
           }
         } catch (e: Exception) {
           Log.e(TAG, "onAttachedToWindow postDelayed exception: ${e.message}", e)
@@ -651,20 +724,8 @@ class ReactNativeLive2dView(context: Context, appContext: AppContext) : ExpoView
     try {
       glSurfaceView.onPause()
       
-      // 清理 Live2D 资源，但不销毁单例
-      if (isInitialized) {
-        val delegate = LAppDelegate.getInstance()
-        Log.d(TAG, "Cleaning up Live2D resources on detach")
-        
-        // 只调用onStop来清理view，不调用onDestroy来保持单例
-        delegate.onStop()
-        
-        // 重置初始化状态，但不销毁delegate
-        isInitialized = false
-        isGLSetupComplete = false
-        
-        Log.d(TAG, "Live2D resources cleaned up")
-      }
+      // 暂停渲染，但不清理Live2D资源，因为可能会快速重新附加
+      Log.d(TAG, "View paused, Live2D resources kept alive for quick reattachment")
     } catch (e: Exception) {
       Log.e(TAG, "Failed to cleanup: ${e.message}")
     }
