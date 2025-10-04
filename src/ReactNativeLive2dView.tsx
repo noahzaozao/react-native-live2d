@@ -22,7 +22,7 @@ export default function ReactNativeLive2dView(props: ReactNativeLive2DViewProps)
 
   // 添加日志来跟踪 modelPath 的变化
   useEffect(() => {
-    console.log('[ReactNativeLive2dView] modelPath changed:', modelPath);
+    console.log('[ReactNativeLive2dView] modelPath:', modelPath);
   }, [modelPath]);
 
   useEffect(() => {

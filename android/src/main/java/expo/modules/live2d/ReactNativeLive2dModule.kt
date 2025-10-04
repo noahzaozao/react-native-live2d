@@ -74,51 +74,6 @@ class ReactNativeLive2dModule : Module() {
       }
     }
 
-    AsyncFunction("initializeLive2D") { promise: Promise ->
-      try {
-        Log.d(TAG, "Initializing Live2D framework")
-        
-        // 初始化 Live2D 框架
-        val delegate = LAppDelegate.getInstance()
-        
-        // 检查是否需要初始化
-        val currentView = delegate.getView()
-        val textureManager = delegate.getTextureManager()
-        
-        if (currentView == null || textureManager == null) {
-          Log.d(TAG, "Live2D framework not initialized, initializing now")
-          
-          // 获取当前 Activity
-          val activity = appContext.currentActivity
-          if (activity == null) {
-            promise.reject("INIT_ERROR", "No current activity available for initialization", null)
-            return@AsyncFunction
-          }
-          
-          // 初始化 Live2D
-          delegate.onStart(activity)
-          
-          // 验证初始化是否成功
-          val newView = delegate.getView()
-          val newTextureManager = delegate.getTextureManager()
-          
-          if (newView != null && newTextureManager != null) {
-            Log.d(TAG, "Live2D framework initialized successfully")
-            promise.resolve(true)
-          } else {
-            promise.reject("INIT_ERROR", "Live2D framework initialization failed - view or texture manager is null", null)
-          }
-        } else {
-          Log.d(TAG, "Live2D framework already initialized")
-          promise.resolve(true)
-        }
-        
-      } catch (e: Exception) {
-        Log.e(TAG, "Failed to initialize Live2D: ${e.message}")
-        promise.reject("INIT_ERROR", "Failed to initialize Live2D: ${e.message}", e)
-      }
-    }
-
     // 内部自动初始化方法
     fun ensureLive2DInitialized(): Boolean {
       try {

@@ -18,6 +18,7 @@ class GLRenderer : GLSurfaceView.Renderer {
     
     // Called at initialization (when the drawing context is lost and recreated).
     override fun onSurfaceCreated(unused: GL10?, config: EGLConfig?) {
+        Log.d("GLRenderer", "onSurfaceCreated")
         try {
             LAppDelegate.getInstance().onSurfaceCreated()
         } catch (e: Exception) {
@@ -27,6 +28,7 @@ class GLRenderer : GLSurfaceView.Renderer {
 
     // Mainly called when switching between landscape and portrait.
     override fun onSurfaceChanged(unused: GL10?, width: Int, height: Int) {
+        Log.d("GLRenderer", "onSurfaceChanged: ${width}x${height}")
         try {
             val delegate = LAppDelegate.getInstance()
             if (delegate.getView() != null) {

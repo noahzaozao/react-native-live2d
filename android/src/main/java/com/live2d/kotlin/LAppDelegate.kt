@@ -145,6 +145,8 @@ class LAppDelegate private constructor() {
             Log.e("LAppDelegate", "OpenGL error after initial setup: $error")
         }
 
+        Log.d("LAppDelegate", "onSurfaceCreated: before CubismFramework initialize")
+
         // Initialize Cubism SDK framework
         CubismFramework.initialize()
 
