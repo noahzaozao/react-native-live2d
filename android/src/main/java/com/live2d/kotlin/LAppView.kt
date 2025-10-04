@@ -201,19 +201,23 @@ class LAppView : AutoCloseable {
 
     // 描画する
     fun render() {
+        // if (LAppDefine.DEBUG_LOG_ENABLE) {
+        //     android.util.Log.d("LAppView", "render: Starting render process")
+        // }
+        
         // 画面サイズを取得する。
         val maxWidth = LAppDelegate.getInstance().windowWidth
         val maxHeight = LAppDelegate.getInstance().windowHeight
+
+        // if (LAppDefine.DEBUG_LOG_ENABLE) {
+        //     android.util.Log.d("LAppView", "render: Window size: ${maxWidth}x${maxHeight}")
+        // }
 
         // 设置 OpenGL 状态
         GLES20.glEnable(GLES20.GL_BLEND)
         GLES20.glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
         GLES20.glDisable(GLES20.GL_DEPTH_TEST)
         GLES20.glDisable(GLES20.GL_CULL_FACE)
-        
-        // if (LAppDefine.DEBUG_LOG_ENABLE) {
-        //     android.util.Log.d("LAppView", "render: OpenGL state configured for rendering")
-        // }
 
         // 首先渲染背景
         backSprite?.let { sprite ->
@@ -223,14 +227,21 @@ class LAppView : AutoCloseable {
             sprite.setWindowSize(maxWidth, maxHeight)
             sprite.render()
         } ?: run {
-            if (LAppDefine.DEBUG_LOG_ENABLE) {
-                android.util.Log.w("LAppView", "render: backSprite is null!")
-            }
+            // if (LAppDefine.DEBUG_LOG_ENABLE) {
+            //     android.util.Log.w("LAppView", "render: backSprite is null!")
+            // }
         }
 
         // 然后渲染Live2D模型
+        // if (LAppDefine.DEBUG_LOG_ENABLE) {
+        //     android.util.Log.d("LAppView", "render: About to call live2dManager.onUpdate()")
+        // }
         val live2dManager = LAppLive2DManager.getInstance()
         live2dManager.onUpdate()
+        
+        // if (LAppDefine.DEBUG_LOG_ENABLE) {
+        //     android.util.Log.d("LAppView", "render: live2dManager.onUpdate() completed")
+        // }
 
         // 最后渲染UI元素，显示在最上层
         gearSprite?.let { sprite ->
@@ -241,6 +252,10 @@ class LAppView : AutoCloseable {
             sprite.setWindowSize(maxWidth, maxHeight)
             sprite.render()
         }
+        
+        // if (LAppDefine.DEBUG_LOG_ENABLE) {
+        //     android.util.Log.d("LAppView", "render: Render process completed")
+        // }
 
         if (isChangedModel) {
             isChangedModel = false

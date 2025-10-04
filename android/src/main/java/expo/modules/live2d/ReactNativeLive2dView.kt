@@ -36,13 +36,13 @@ class ReactNativeLive2dView(context: Context, appContext: AppContext) : ExpoView
   init {
     Log.d(TAG, "init")
     try {
-      // 确保在主线程中初始化
+      // 只初始化基本的UI组件，不初始化Live2D
       if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) {
-        initializeComponents()
+        initializeBasicComponents()
       } else {
         // 如果不在主线程，切换到主线程
         post {
-          initializeComponents()
+          initializeBasicComponents()
         }
       }
     } catch (e: Exception) {
@@ -54,13 +54,27 @@ class ReactNativeLive2dView(context: Context, appContext: AppContext) : ExpoView
     }
   }
   
+  private fun initializeBasicComponents() {
+    try {
+      Log.d(TAG, "initializeBasicComponents")
+      glSurfaceView = GLSurfaceView(context)
+      renderer = GLRenderer()
+      setupContainer()
+      // 不设置 isGLSetupComplete = true，等待 Live2D 初始化完成
+      Log.d(TAG, "initializeBasicComponents successfully")
+    } catch (e: Exception) {
+      Log.e(TAG, "Failed to initialize basic components: ${e.message}", e)
+      dispatchEvent("onError", mapOf(
+        "error" to "GL_INIT_ERROR",
+        "message" to "Failed to initialize basic components: ${e.message}"
+      ))
+    }
+  }
+
   private fun initializeComponents() {
     try {
       Log.d(TAG, "initializeComponents")
-      glSurfaceView = GLSurfaceView(context)
-      renderer = GLRenderer()
       setupGLSurfaceView()
-      setupContainer()
       isGLSetupComplete = true
       Log.d(TAG, "initializeComponents successfully")
     } catch (e: Exception) {
@@ -79,19 +93,6 @@ class ReactNativeLive2dView(context: Context, appContext: AppContext) : ExpoView
       // 基本的 OpenGL ES 2.0 设置
       glSurfaceView.setEGLContextClientVersion(2)
       Log.d(TAG, "setupGLSurfaceView setEGLContextClientVersion 2")
-      
-      // 首先初始化Live2D，确保在GLSurfaceView生命周期开始前完成
-      initializeLive2D()
-      
-      // 验证初始化是否成功
-      if (!isInitialized) {
-        Log.e(TAG, "Live2D initialization failed, cannot setup GLSurfaceView")
-        dispatchEvent("onError", mapOf(
-          "error" to "GL_SETUP_ERROR",
-          "message" to "Live2D initialization failed"
-        ))
-        return
-      }
       
       // 设置渲染器
       glSurfaceView.setRenderer(renderer)
@@ -228,15 +229,37 @@ class ReactNativeLive2dView(context: Context, appContext: AppContext) : ExpoView
     Log.d(TAG, "loadModel $modelPath")
     Log.d(TAG, "loadModel called - isGLSetupComplete: $isGLSetupComplete, isInitialized: $isInitialized")
 
-    if (!isGLSetupComplete) {
-      Log.w(TAG, "loadModel isGLSetupComplete false")
-      post {
-        loadModel(modelPath)
+    // 自动确保 Live2D 已初始化
+    if (!isInitialized) {
+      Log.w(TAG, "loadModel isInitialized false, initializing Live2D first")
+      initializeLive2D()
+      
+      if (!isInitialized) {
+        Log.e(TAG, "loadModel failed to initialize Live2D")
+        dispatchEvent("onError", mapOf(
+          "error" to "INIT_ERROR",
+          "message" to "Failed to initialize Live2D before loading model"
+        ))
+        return
       }
-      return
     }
 
-    Log.d(TAG, "loadModel isGLSetupComplete true")
+    // 自动确保 GL 组件已设置完成
+    if (!isGLSetupComplete) {
+      Log.w(TAG, "loadModel isGLSetupComplete false, initializing GL components")
+      initializeComponents()
+      
+      if (!isGLSetupComplete) {
+        Log.e(TAG, "loadModel failed to initialize GL components")
+        dispatchEvent("onError", mapOf(
+          "error" to "GL_INIT_ERROR",
+          "message" to "Failed to initialize GL components before loading model"
+        ))
+        return
+      }
+    }
+
+    Log.d(TAG, "loadModel both Live2D and GL components are ready")
 
     try {
       Log.d(TAG, "loadModel try Starting model loading process")

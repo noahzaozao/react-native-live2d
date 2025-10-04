@@ -486,7 +486,14 @@ class LAppModel : CubismUserModel() {
     }
 
     fun draw(matrix: CubismMatrix44) {
+        // if (LAppDefine.DEBUG_LOG_ENABLE) {
+        //     LAppPal.printLog("draw: Starting draw process, model is ${if (model != null) "not null" else "null"}")
+        // }
+        
         if (model == null) {
+            // if (LAppDefine.DEBUG_LOG_ENABLE) {
+            //     LAppPal.printLog("draw: Model is null, skipping draw")
+            // }
             return
         }
 
@@ -499,15 +506,49 @@ class LAppModel : CubismUserModel() {
             return
         }
 
-        // 各読み込み済みテクスチャのサイズを取得
-        val textureManager = LAppDelegate.getInstance().getTextureManager()!!
+        // if (LAppDefine.DEBUG_LOG_ENABLE) {
+        //     LAppPal.printLog("draw: Renderer is available, proceeding with draw")
+        // }
 
-        matrix.multiplyByMatrix(modelMatrix)
+        // 使用官方示例的矩阵乘法方法
+        // キャッシュ変数の定義を避けるために、multiplyByMatrix()ではなく、multiply()を使用する。
+        // 减少调试日志
+        // if (LAppDefine.DEBUG_LOG_ENABLE) {
+        //     LAppPal.printLog("draw: Before matrix multiplication")
+        //     LAppPal.printLog("draw: modelMatrix is null: ${modelMatrix == null}")
+        //     if (modelMatrix != null) {
+        //         LAppPal.printLog("draw: modelMatrix values: ${modelMatrix.getArray().contentToString()}")
+        //     }
+        //     LAppPal.printLog("draw: projection matrix values: ${matrix.getArray().contentToString()}")
+        // }
+        
+        if (modelMatrix != null) {
+            CubismMatrix44.multiply(
+                modelMatrix.getArray(),
+                matrix.getArray(),
+                matrix.getArray()
+            )
+            
+            // if (LAppDefine.DEBUG_LOG_ENABLE) {
+            //     LAppPal.printLog("draw: After matrix multiplication")
+            //     LAppPal.printLog("draw: Result matrix values: ${matrix.getArray().contentToString()}")
+            // }
+        } else {
+            // if (LAppDefine.DEBUG_LOG_ENABLE) {
+            //     LAppPal.printLog("draw: modelMatrix is null, using identity matrix")
+            // }
+            // 如果 modelMatrix 为 null，使用单位矩阵
+            matrix.loadIdentity()
+        }
 
         renderer.setMvpMatrix(matrix)
         
         // 使用官方示例的方法绘制模型
         renderer.drawModel()
+        
+        // if (LAppDefine.DEBUG_LOG_ENABLE) {
+        //     LAppPal.printLog("draw: renderer.drawModel() completed")
+        // }
     }
 
     /**
@@ -894,7 +935,17 @@ class LAppModel : CubismUserModel() {
 
         // レイアウト情報が存在すればその情報からモデル行列をセットアップする
         if (modelSetting?.getLayoutMap(layout) == true) {
+            if (LAppDefine.DEBUG_LOG_ENABLE) {
+                LAppPal.printLog("setupModelFromFileSystem: Layout found and applied to modelMatrix")
+                for ((key, value) in layout) {
+                    LAppPal.printLog("setupModelFromFileSystem: Layout: $key = $value")
+                }
+            }
             modelMatrix?.setupFromLayout(layout)
+        } else {
+            if (LAppDefine.DEBUG_LOG_ENABLE) {
+                LAppPal.printLog("setupModelFromFileSystem: No layout information found, using default modelMatrix")
+            }
         }
 
         model?.saveParameters()

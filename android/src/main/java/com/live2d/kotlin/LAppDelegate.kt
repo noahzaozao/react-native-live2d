@@ -188,6 +188,10 @@ class LAppDelegate private constructor() {
         glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT)
         glClearDepthf(1.0f)
 
+        // if (LAppDefine.DEBUG_LOG_ENABLE) {
+        //     Log.d("LAppDelegate", "run: About to call view.render(), view is ${if (view != null) "not null" else "null"}")
+        // }
+        
         view?.render()
 
         // アプリケーションを非アクティブにする
