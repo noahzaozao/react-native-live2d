@@ -47,7 +47,7 @@ export interface ReactNativeLive2DViewProps {
    * 视图样式
    */
   style?: StyleProp<ViewStyle>;
-  
+
   /**
    * 触摸结束事件
    */
@@ -74,13 +74,7 @@ export interface Live2DModule {
    * 初始化 Live2D 框架
    */
   initializeLive2D(): Promise<boolean>;
-  
-  /**
-   * 释放模型资源
-   * @param modelPath 模型文件路径
-   */
-  releaseModel(modelPath: string): Promise<void>;
-  
+
   /**
    * 获取可用模型列表
    */

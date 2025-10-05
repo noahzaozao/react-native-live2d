@@ -159,13 +159,112 @@ class ReactNativeLive2dView(context: Context, appContext: AppContext) :
         handler.post(runnable)
     }
 
+    private fun runAfterGLReady(operationKey: String, action: () -> Unit) {
+        if (pendingOperations.contains(operationKey)) {
+            Log.d(
+                    TAG,
+                    "runAfterGLReady: operation '$operationKey' already pending, skip re-schedule"
+            )
+            return
+        }
+        pendingOperations.add(operationKey)
+
+        val handler = android.os.Handler(context.mainLooper)
+        val checker =
+                object : Runnable {
+                    override fun run() {
+                        try {
+                            if (isGLSetupComplete && ::glSurfaceView.isInitialized) {
+                                try {
+                                    glSurfaceView.queueEvent {
+                                        try {
+                                            action()
+                                        } finally {
+                                            pendingOperations.remove(operationKey)
+                                        }
+                                    }
+                                } catch (e: Exception) {
+                                    Log.e(TAG, "runAfterGLReady queueEvent error: ${e.message}")
+                                    pendingOperations.remove(operationKey)
+                                }
+                            } else {
+                                handler.postDelayed(this, 16)
+                            }
+                        } catch (e: Exception) {
+                            Log.e(TAG, "runAfterGLReady error: ${e.message}")
+                            pendingOperations.remove(operationKey)
+                        }
+                    }
+                }
+        handler.post(checker)
+    }
+
     fun loadModel(modelPath: String) {
         Log.d(TAG, "loadModel: $modelPath")
 
+        // 去重检查：如果已经加载了相同的模型路径，则跳过
+        if (this.modelPath == modelPath && isInitialized) {
+            Log.d(TAG, "loadModel: model '$modelPath' already loaded, skipping")
+            return
+        }
+
+        // 在加载新模型前，先重置视图状态（除非是第一次加载）
+        // if (isInitialized) {
+        //     Log.d(TAG, "loadModel: resetting view state before loading new model")
+        //     resetViewState()
+        // }
+
         this.modelPath = modelPath
+
+        // 若 GL 尚未完成初始化，则延迟到 GL 准备就绪后再执行
+        // if (!isGLSetupComplete) {
+        //     Log.d(TAG, "loadModel: GL not ready, deferring model load")
+        //     runAfterGLReady("loadModel:$modelPath") {
+        //         try {
+        //             val manager = LAppLive2DManager.getInstance()
+        //             loadModelFromFileSystem(modelPath, manager)
+        //             glSurfaceView.requestRender()
+        //             isInitialized = true
+        //             dispatchEvent("onModelLoaded", mapOf("modelPath" to modelPath))
+        //         } catch (e: Exception) {
+        //             Log.e(TAG, "deferred loadModel onError: ${e.message}", e)
+        //             dispatchEvent(
+        //                     "onError",
+        //                     mapOf(
+        //                             "error" to "MODEL_LOAD_ERROR",
+        //                             "message" to "deferred loadModel onError: ${e.message}"
+        //                     )
+        //             )
+        //         }
+        //     }
+        //     return
+        // }
 
         try {
             Log.d(TAG, "loadModel: starting model loading process")
+
+            // 清理后可能移除了 renderer，这里需要确保 GL 渲染器与 Delegate 已就绪
+            if (!isGLSetupComplete || !::renderer.isInitialized) {
+                Log.d(TAG, "loadModel: GL not ready, reinitializing renderer and delegate")
+                try {
+                    glSurfaceView.setEGLContextClientVersion(2)
+                    if (!::renderer.isInitialized) {
+                        renderer = GLRenderer()
+                    }
+                    glSurfaceView.setRenderer(renderer)
+                    glSurfaceView.renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
+                    glSurfaceView.onResume()
+                } catch (e: Exception) {
+                    Log.w(TAG, "loadModel: failed to re-setup GL surface: ${e.message}")
+                }
+                // 确保 LAppDelegate 处于启动状态
+                try {
+                    getActivity()?.let { delegate.onStart(it) }
+                } catch (e: Exception) {
+                    Log.w(TAG, "loadModel: failed to re-start delegate: ${e.message}")
+                }
+                isGLSetupComplete = true
+            }
 
             // 确保在 GL 线程加载模型与创建纹理
             Log.d(TAG, "loadModel before queueEvent")
@@ -181,6 +280,9 @@ class ReactNativeLive2dView(context: Context, appContext: AppContext) :
                     Log.d(TAG, "loadModel queueEvent loadModelFromFileSystem success")
 
                     glSurfaceView.requestRender()
+
+                    // 标记模型已成功加载
+                    isInitialized = true
 
                     dispatchEvent("onModelLoaded", mapOf("modelPath" to modelPath))
 
@@ -306,6 +408,80 @@ class ReactNativeLive2dView(context: Context, appContext: AppContext) :
 
         // 延迟检查渲染器可用性，因为渲染器可能在模型添加到管理器后才初始化
         // bindTexturesWhenReady(model)
+    }
+
+    fun clearModel() {
+        Log.d(TAG, "clearModel")
+
+        // 1. 清理Live2D模型资源，避免Expo Refresh后的状态不一致
+        try {
+            val manager = LAppLive2DManager.getInstance()
+            manager.releaseAllModel()
+            Log.d(TAG, "onDetachedFromWindow: released all models")
+        } catch (e: Exception) {
+            Log.w(TAG, "onDetachedFromWindow: failed to release models: ${e.message}")
+        }
+
+        resetViewState()
+    }
+
+    fun clearAll() {
+        Log.d(TAG, "clearAll")
+
+        clearModel()
+
+        // 2. 清理LAppView资源（包括sprite shader等）
+        try {
+            delegate.view?.close()
+            Log.d(TAG, "onDetachedFromWindow: closed LAppView")
+        } catch (e: Exception) {
+            Log.w(TAG, "onDetachedFromWindow: failed to close LAppView: ${e.message}")
+        }
+
+        // 3. 清理纹理管理器（通过LAppDelegate的onStop方法）
+        try {
+            // 先在 GL 线程释放纹理与渲染相关资源
+            try {
+                val tm = delegate.getTextureManager()
+                if (tm != null) {
+                    glSurfaceView.queueEvent {
+                        try {
+                            tm.dispose()
+                        } catch (_: Exception) {}
+                    }
+                }
+            } catch (_: Exception) {}
+            // 然后再调用 onStop 做框架级清理
+            delegate.onStop()
+            Log.d(TAG, "onDetachedFromWindow: called delegate.onStop()")
+        } catch (e: Exception) {
+            Log.w(TAG, "onDetachedFromWindow: failed to call delegate.onStop(): ${e.message}")
+        }
+
+        // 4. 暂停GLSurfaceView渲染
+        try {
+            glSurfaceView.onPause()
+            Log.d(TAG, "onDetachedFromWindow: paused GLSurfaceView")
+        } catch (e: Exception) {
+            Log.w(TAG, "onDetachedFromWindow: failed to pause GLSurfaceView: ${e.message}")
+        }
+
+        // 5. 断开渲染器引用，帮助 GC
+        try {
+            // 在 GL 线程上清空 renderer 相关引用（若有内部状态）
+            try {
+                glSurfaceView.queueEvent { /* no-op hook to ensure prior GL tasks flushed */}
+            } catch (_: Exception) {}
+            glSurfaceView.setRenderer(null)
+            Log.d(TAG, "onDetachedFromWindow: glSurfaceView.setRenderer(null)")
+        } catch (e: Exception) {
+            Log.w(TAG, "onDetachedFromWindow: failed to unset renderer: ${e.message}")
+        }
+
+        // 6. 重置组件状态
+        resetViewState()
+        isGLSetupComplete = false
+        live2dManager = null
     }
 
     fun startMotion(motionGroup: String, motionIndex: Int) {
@@ -517,6 +693,38 @@ class ReactNativeLive2dView(context: Context, appContext: AppContext) :
         }
     }
 
+    /** 重置视图状态，在模型释放后调用 */
+    fun resetViewState() {
+        Log.d(TAG, "resetViewState: resetting view state after model release")
+
+        try {
+            // 重置状态标志
+            isInitialized = false
+            modelPath = null
+
+            // 清空队列
+            motionQueue.clear()
+            expressionQueue.clear()
+            pendingOperations.clear()
+
+            // 重置当前状态
+            // currentMotionGroup = null
+            // currentMotionIndex = null
+            // currentExpressionId = null
+            // currentScale = null
+            // currentPosition = null
+            // currentAutoBlink = null
+            // currentAutoBreath = null
+
+            // 停止动作播放
+            isMotionPlaying = false
+
+            Log.d(TAG, "resetViewState: view state reset completed")
+        } catch (e: Exception) {
+            Log.e(TAG, "resetViewState: failed to reset view state: ${e.message}")
+        }
+    }
+
     override fun onTouchEvent(event: MotionEvent): Boolean {
         val x = event.x
         val y = event.y
@@ -567,68 +775,7 @@ class ReactNativeLive2dView(context: Context, appContext: AppContext) :
 
         Log.d(TAG, "onDetachedFromWindow")
 
-        // 1. 清理Live2D模型资源，避免Expo Refresh后的状态不一致
-        try {
-            val manager = LAppLive2DManager.getInstance()
-            manager.releaseAllModel()
-            Log.d(TAG, "onDetachedFromWindow: released all models")
-        } catch (e: Exception) {
-            Log.w(TAG, "onDetachedFromWindow: failed to release models: ${e.message}")
-        }
-
-        // 2. 清理LAppView资源（包括sprite shader等）
-        try {
-            delegate.view?.close()
-            Log.d(TAG, "onDetachedFromWindow: closed LAppView")
-        } catch (e: Exception) {
-            Log.w(TAG, "onDetachedFromWindow: failed to close LAppView: ${e.message}")
-        }
-
-        // 3. 清理纹理管理器（通过LAppDelegate的onStop方法）
-        try {
-            // 先在 GL 线程释放纹理与渲染相关资源
-            try {
-                val tm = delegate.getTextureManager()
-                if (tm != null) {
-                    glSurfaceView.queueEvent {
-                        try {
-                            tm.dispose()
-                        } catch (_: Exception) {}
-                    }
-                }
-            } catch (_: Exception) {}
-            // 然后再调用 onStop 做框架级清理
-            delegate.onStop()
-            Log.d(TAG, "onDetachedFromWindow: called delegate.onStop()")
-        } catch (e: Exception) {
-            Log.w(TAG, "onDetachedFromWindow: failed to call delegate.onStop(): ${e.message}")
-        }
-
-        // 4. 暂停GLSurfaceView渲染
-        try {
-            glSurfaceView.onPause()
-            Log.d(TAG, "onDetachedFromWindow: paused GLSurfaceView")
-        } catch (e: Exception) {
-            Log.w(TAG, "onDetachedFromWindow: failed to pause GLSurfaceView: ${e.message}")
-        }
-
-        // 5. 断开渲染器引用，帮助 GC
-        try {
-            // 在 GL 线程上清空 renderer 相关引用（若有内部状态）
-            try {
-                glSurfaceView.queueEvent { /* no-op hook to ensure prior GL tasks flushed */}
-            } catch (_: Exception) {}
-            glSurfaceView.setRenderer(null)
-            Log.d(TAG, "onDetachedFromWindow: glSurfaceView.setRenderer(null)")
-        } catch (e: Exception) {
-            Log.w(TAG, "onDetachedFromWindow: failed to unset renderer: ${e.message}")
-        }
-
-        // 6. 重置组件状态
-        isGLSetupComplete = false
-        isInitialized = false
-        modelPath = null
-        live2dManager = null
+        clearAll()
 
         Log.d(TAG, "onDetachedFromWindow: cleanup completed")
     }
