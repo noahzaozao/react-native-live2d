@@ -231,4 +231,24 @@ class LAppTextureManager {
 
         return textureInfo
     }
+
+    /**
+     * 释放由本管理器创建的所有 OpenGL 纹理。需在 GL 线程调用。
+     */
+    fun dispose() {
+        if (textures.isEmpty()) return
+        try {
+            val ids = IntArray(textures.size)
+            for (i in textures.indices) {
+                ids[i] = textures[i].id
+            }
+            if (ids.isNotEmpty()) {
+                GLES20.glDeleteTextures(ids.size, ids, 0)
+            }
+        } catch (_: Exception) {
+            // 忽略清理异常
+        } finally {
+            textures.clear()
+        }
+    }
 }

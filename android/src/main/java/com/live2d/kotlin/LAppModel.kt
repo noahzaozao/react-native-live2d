@@ -543,12 +543,28 @@ class LAppModel : CubismUserModel() {
 
         renderer.setMvpMatrix(matrix)
         
+        // 在绘制前，如果存在延迟纹理，尝试在 GL 线程绑定
+        if (pendingTextures.isNotEmpty()) {
+            try {
+                bindPendingTextures()
+            } catch (_: Exception) {
+                // 忽略单帧失败，后续帧继续尝试
+            }
+        }
+
         // 使用官方示例的方法绘制模型
         renderer.drawModel()
         
         // if (LAppDefine.DEBUG_LOG_ENABLE) {
         //     LAppPal.printLog("draw: renderer.drawModel() completed")
         // }
+    }
+
+    /**
+     * 公共方法：查询主动作是否播放完成
+     */
+    fun isMainMotionFinished(): Boolean {
+        return motionManager.isFinished()
     }
 
     /**
