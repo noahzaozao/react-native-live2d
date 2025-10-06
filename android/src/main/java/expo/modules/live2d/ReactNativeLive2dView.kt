@@ -244,27 +244,27 @@ class ReactNativeLive2dView(context: Context, appContext: AppContext) :
             Log.d(TAG, "loadModel: starting model loading process")
 
             // 清理后可能移除了 renderer，这里需要确保 GL 渲染器与 Delegate 已就绪
-            if (!isGLSetupComplete || !::renderer.isInitialized) {
-                Log.d(TAG, "loadModel: GL not ready, reinitializing renderer and delegate")
-                try {
-                    glSurfaceView.setEGLContextClientVersion(2)
-                    if (!::renderer.isInitialized) {
-                        renderer = GLRenderer()
-                    }
-                    glSurfaceView.setRenderer(renderer)
-                    glSurfaceView.renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
-                    glSurfaceView.onResume()
-                } catch (e: Exception) {
-                    Log.w(TAG, "loadModel: failed to re-setup GL surface: ${e.message}")
-                }
-                // 确保 LAppDelegate 处于启动状态
-                try {
-                    getActivity()?.let { delegate.onStart(it) }
-                } catch (e: Exception) {
-                    Log.w(TAG, "loadModel: failed to re-start delegate: ${e.message}")
-                }
-                isGLSetupComplete = true
-            }
+            // if (!isGLSetupComplete || !::renderer.isInitialized) {
+            //     Log.d(TAG, "loadModel: GL not ready, reinitializing renderer and delegate")
+            //     try {
+            //         glSurfaceView.setEGLContextClientVersion(2)
+            //         if (!::renderer.isInitialized) {
+            //             renderer = GLRenderer()
+            //         }
+            //         glSurfaceView.setRenderer(renderer)
+            //         glSurfaceView.renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
+            //         glSurfaceView.onResume()
+            //     } catch (e: Exception) {
+            //         Log.w(TAG, "loadModel: failed to re-setup GL surface: ${e.message}")
+            //     }
+            //     // 确保 LAppDelegate 处于启动状态
+            //     try {
+            //         getActivity()?.let { delegate.onStart(it) }
+            //     } catch (e: Exception) {
+            //         Log.w(TAG, "loadModel: failed to re-start delegate: ${e.message}")
+            //     }
+            //     isGLSetupComplete = true
+            // }
 
             // 确保在 GL 线程加载模型与创建纹理
             Log.d(TAG, "loadModel before queueEvent")
@@ -472,14 +472,15 @@ class ReactNativeLive2dView(context: Context, appContext: AppContext) :
             try {
                 glSurfaceView.queueEvent { /* no-op hook to ensure prior GL tasks flushed */}
             } catch (_: Exception) {}
-            glSurfaceView.setRenderer(null)
-            Log.d(TAG, "onDetachedFromWindow: glSurfaceView.setRenderer(null)")
+            // 注意：GLSurfaceView 一旦设置过渲染器就不能再设置为 null，只能暂停
+            // 这里我们只暂停渲染，不尝试 unset renderer
+            Log.d(TAG, "onDetachedFromWindow: GLSurfaceView renderer kept (cannot unset)")
         } catch (e: Exception) {
-            Log.w(TAG, "onDetachedFromWindow: failed to unset renderer: ${e.message}")
+            Log.w(TAG, "onDetachedFromWindow: failed to flush GL tasks: ${e.message}")
         }
 
         // 6. 重置组件状态
-        resetViewState()
+        // resetViewState()
         isGLSetupComplete = false
         live2dManager = null
     }
@@ -699,13 +700,13 @@ class ReactNativeLive2dView(context: Context, appContext: AppContext) :
 
         try {
             // 重置状态标志
-            isInitialized = false
-            modelPath = null
+            this.isInitialized = false
+            this.modelPath = null
 
             // 清空队列
-            motionQueue.clear()
-            expressionQueue.clear()
-            pendingOperations.clear()
+            this.motionQueue.clear()
+            this.expressionQueue.clear()
+            this.pendingOperations.clear()
 
             // 重置当前状态
             // currentMotionGroup = null
@@ -717,7 +718,7 @@ class ReactNativeLive2dView(context: Context, appContext: AppContext) :
             // currentAutoBreath = null
 
             // 停止动作播放
-            isMotionPlaying = false
+            this.isMotionPlaying = false
 
             Log.d(TAG, "resetViewState: view state reset completed")
         } catch (e: Exception) {
@@ -766,8 +767,51 @@ class ReactNativeLive2dView(context: Context, appContext: AppContext) :
 
         Log.d(TAG, "onAttachedToWindow")
 
-        // Expo Refresh 后会重新 init，所以这里不需要重复初始化
-        // init 方法已经处理了所有必要的初始化工作
+        // 通过 react native setIsPageFocused(false) 释放之后会重新通过 init 初始化
+        // 所以这里不需要做什么
+
+        // RN 页面切换回来时，视图会 re-attach，但不会调用构造/ init。
+        // 如果之前在 onDetachedFromWindow 中做了清理，这里需要恢复 GL 与 delegate 状态。
+        // try {
+        //     if (live2dManager == null) {
+        //         Log.d(TAG, "onAttachedToWindow: live2dManager is null, initializing")
+        //         live2dManager = LAppLive2DManager.getInstance()
+        //     }
+            
+        //     if (!isGLSetupComplete) {
+        //         Log.d(TAG, "onAttachedToWindow: reinitializing GL context and delegate")
+                
+        //         // 如果 GLSurfaceView 已存在但渲染器未初始化，只重新设置渲染器
+        //         if (::glSurfaceView.isInitialized) {
+        //             try {
+        //                 renderer = if (::renderer.isInitialized) renderer else GLRenderer()
+        //                 // glSurfaceView.setEGLContextClientVersion(2)
+        //                 // glSurfaceView.setRenderer(renderer)
+        //                 // glSurfaceView.renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
+        //                 glSurfaceView.onResume()
+        //                 isGLSetupComplete = true
+        //                 Log.d(TAG, "onAttachedToWindow: GL context restored")
+        //             } catch (e: Exception) {
+        //                 Log.w(TAG, "onAttachedToWindow: failed to restore GL context: ${e.message}")
+        //             }
+        //         } else {
+        //             // 如果 GLSurfaceView 不存在，完整初始化
+        //             try {
+        //                 initializeComponents()
+        //             } catch (e: Exception) {
+        //                 Log.w(TAG, "onAttachedToWindow: failed to setup GL surface: ${e.message}")
+        //             }
+        //         }
+
+        //         try {
+        //             getActivity()?.let { delegate.onStart(it) }
+        //         } catch (e: Exception) {
+        //             Log.w(TAG, "onAttachedToWindow: failed to start delegate: ${e.message}")
+        //         }
+        //     }
+        // } catch (e: Exception) {
+        //     Log.w(TAG, "onAttachedToWindow: reinit guard error: ${e.message}")
+        // }
     }
 
     override fun onDetachedFromWindow() {
