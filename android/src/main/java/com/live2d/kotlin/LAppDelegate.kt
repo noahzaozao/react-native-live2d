@@ -27,9 +27,15 @@ class LAppDelegate private constructor() {
 
         /**
          * クラスのインスタンス（シングルトン）を解放する。
+         * 注意：调用此方法前必须确保所有 GL 回调已停止
          */
         fun releaseInstance() {
-            s_instance = null
+            synchronized(this) {
+                s_instance?.let {
+                    it.isShuttingDown = true
+                }
+                s_instance = null
+            }
         }
     }
 
@@ -40,6 +46,12 @@ class LAppDelegate private constructor() {
     internal var windowWidth: Int = 0
     internal var windowHeight: Int = 0
     private var isActive: Boolean = true
+    
+    /**
+     * 标记实例正在关闭，避免在清理过程中继续处理回调
+     */
+    @Volatile
+    private var isShuttingDown: Boolean = false
 
     /**
      * モデルシーンインデックス
@@ -83,6 +95,10 @@ class LAppDelegate private constructor() {
         if (LAppDefine.DEBUG_LOG_ENABLE) {
             LAppPal.printLog("LAppDelegate.onStart: Initializing textureManager")
         }
+        
+        // 重置关闭标志，允许重新使用
+        isShuttingDown = false
+        
         textureManager = LAppTextureManager()
         view = LAppView()
 
@@ -103,6 +119,10 @@ class LAppDelegate private constructor() {
         if (LAppDefine.DEBUG_LOG_ENABLE) {
             LAppPal.printLog("LAppDelegate.onStop: Cleaning up resources")
         }
+        
+        // 标记正在关闭，阻止新的操作
+        isShuttingDown = true
+        
         view?.let {
             it.close()
             view = null  // 显式设置为null，避免状态不一致
@@ -121,33 +141,25 @@ class LAppDelegate private constructor() {
     }
 
     fun onDestroy() {
+        if (LAppDefine.DEBUG_LOG_ENABLE) {
+            LAppPal.printLog("LAppDelegate.onDestroy: Releasing singleton instance")
+        }
         releaseInstance()
     }
 
     fun onSurfaceCreated() {
         Log.d("LAppDelegate", "onSurfaceCreated: Starting OpenGL initialization")
         
-        // テクスチャサンプリング設定
         GLES20.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
         GLES20.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
-
-        Log.d("LAppDelegate", "onSurfaceCreated: Texture parameters set")
-
-        // 透過設定
         GLES20.glEnable(GLES20.GL_BLEND)
         GLES20.glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA)
 
-        Log.d("LAppDelegate", "onSurfaceCreated: Blend mode set to GL_ONE, GL_ONE_MINUS_SRC_ALPHA")
-
-        // Check OpenGL errors
         val error = GLES20.glGetError()
         if (error != GLES20.GL_NO_ERROR) {
-            Log.e("LAppDelegate", "OpenGL error after initial setup: $error")
+            Log.e("LAppDelegate", "OpenGL error in onSurfaceCreated: $error")
         }
 
-        Log.d("LAppDelegate", "onSurfaceCreated: before CubismFramework initialize")
-
-        // Initialize Cubism SDK framework
         CubismFramework.initialize()
 
         Log.d("LAppDelegate", "onSurfaceCreated: CubismFramework initialized")
@@ -170,6 +182,7 @@ class LAppDelegate private constructor() {
 
             it.initialize()
             it.initializeSprite()
+            
         } ?: run {
             Log.e("LAppDelegate", "view is null in onSurfaceChanged, cannot initialize")
             return
@@ -182,6 +195,11 @@ class LAppDelegate private constructor() {
     }
 
     fun run() {
+        // 如果正在关闭，停止渲染
+        if (isShuttingDown) {
+            return
+        }
+        
         // 時間更新
         LAppPal.updateTime()
 
@@ -198,11 +216,18 @@ class LAppDelegate private constructor() {
 
         // アプリケーションを非アクティブにする
         if (!isActive) {
-            activity?.finishAndRemoveTask()
+            activity?.runOnUiThread {
+                activity?.finishAndRemoveTask()
+            }
         }
     }
 
     fun onTouchBegan(x: Float, y: Float) {
+        if (view == null) {
+            return
+        }
+        if (isShuttingDown) return
+        
         mouseX = x
         mouseY = y
 
@@ -213,6 +238,8 @@ class LAppDelegate private constructor() {
     }
 
     fun onTouchEnd(x: Float, y: Float) {
+        if (isShuttingDown) return
+        
         mouseX = x
         mouseY = y
 
@@ -223,6 +250,8 @@ class LAppDelegate private constructor() {
     }
 
     fun onTouchMoved(x: Float, y: Float) {
+        if (isShuttingDown) return
+        
         mouseX = x
         mouseY = y
 

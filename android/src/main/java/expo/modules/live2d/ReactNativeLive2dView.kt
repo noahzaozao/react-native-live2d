@@ -7,6 +7,7 @@ import android.view.MotionEvent
 import android.widget.FrameLayout
 import com.live2d.kotlin.GLRenderer
 import com.live2d.kotlin.LAppDelegate
+import com.live2d.kotlin.LAppDefine
 import com.live2d.kotlin.LAppLive2DManager
 import com.live2d.kotlin.LAppModel
 import expo.modules.kotlin.AppContext
@@ -324,20 +325,66 @@ class ReactNativeLive2dView(context: Context, appContext: AppContext) :
         try {
             val view = delegate.getView()
             if (view != null) {
+                // 应用 scale
                 currentScale?.let {
                     try {
                         view.setViewScale(it)
+                        Log.d(TAG, "Applied cached scale: $it")
                     } catch (e: Exception) {
                         Log.w(TAG, "apply cached scale failed: ${e.message}")
                     }
                 }
+                
+                // 应用 position
                 currentPosition?.let { pos ->
                     try {
                         view.setViewPosition(pos.first, pos.second)
+                        Log.d(TAG, "Applied cached position: ${pos.first}, ${pos.second}")
                     } catch (e: Exception) {
                         Log.w(TAG, "apply cached position failed: ${e.message}")
                     }
                 }
+                
+                // 应用 autoBlink（直接设置到模型）
+                currentAutoBlink?.let { enabled ->
+                    try {
+                        // TODO: LAppModel 需要添加 autoBlink 支持
+                        Log.d(TAG, "Cached autoBlink: $enabled (not yet applied)")
+                    } catch (e: Exception) {
+                        Log.w(TAG, "apply cached autoBlink failed: ${e.message}")
+                    }
+                }
+                
+                // 应用 autoBreath（直接设置到模型）
+                currentAutoBreath?.let { enabled ->
+                    try {
+                        // TODO: LAppModel 需要添加 autoBreath 支持
+                        Log.d(TAG, "Cached autoBreath: $enabled (not yet applied)")
+                    } catch (e: Exception) {
+                        Log.w(TAG, "apply cached autoBreath failed: ${e.message}")
+                    }
+                }
+                
+                // 应用 expression
+                currentExpressionId?.let { expId ->
+                    try {
+                        model.setExpression(expId)
+                        Log.d(TAG, "Applied cached expression: $expId")
+                    } catch (e: Exception) {
+                        Log.w(TAG, "apply cached expression failed: ${e.message}")
+                    }
+                }
+                
+                // 应用 motion
+                if (currentMotionGroup != null && currentMotionIndex != null) {
+                    try {
+                        model.startMotion(currentMotionGroup!!, currentMotionIndex!!, LAppDefine.Priority.NORMAL.priority)
+                        Log.d(TAG, "Applied cached motion: ${currentMotionGroup}[$currentMotionIndex]")
+                    } catch (e: Exception) {
+                        Log.w(TAG, "apply cached motion failed: ${e.message}")
+                    }
+                }
+                
                 glSurfaceView.requestRender()
             }
         } catch (e: Exception) {
