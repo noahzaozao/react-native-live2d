@@ -173,4 +173,29 @@ object LAppDefine {
      * Setting this to true would cause double premultiplied alpha processing, resulting in black shadows.
      */
     const val PREMULTIPLIED_ALPHA_ENABLE = true
+    
+    /**
+     * UI Layout Constants
+     */
+    object UILayout {
+        /**
+         * Margin for gear button from right edge (pixels)
+         */
+        const val GEAR_BUTTON_MARGIN = 96f
+        
+        /**
+         * Margin for power button from right edge (pixels)
+         */
+        const val POWER_BUTTON_MARGIN = 96f
+        
+        /**
+         * Retry attempts for surface changed initialization
+         */
+        const val SURFACE_INIT_RETRY_ATTEMPTS = 3
+        
+        /**
+         * Retry delay in milliseconds
+         */
+        const val SURFACE_INIT_RETRY_DELAY_MS = 100L
+    }
 }

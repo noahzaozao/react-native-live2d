@@ -160,7 +160,7 @@ class LAppView : AutoCloseable {
         val gearTexture = textureManager.createTextureFromPngFile(LAppDefine.ResourcePath.ROOT.path + LAppDefine.ResourcePath.GEAR_IMAGE.path)
         
         if (gearTexture != null) {
-            x = windowWidth - gearTexture.width * 0.5f - 96f
+            x = windowWidth - gearTexture.width * 0.5f - LAppDefine.UILayout.GEAR_BUTTON_MARGIN
             y = windowHeight - gearTexture.height * 0.5f
             val gearWidth = gearTexture.width.toFloat()
             val gearHeight = gearTexture.height.toFloat()
@@ -176,7 +176,7 @@ class LAppView : AutoCloseable {
         val powerTexture = textureManager.createTextureFromPngFile(LAppDefine.ResourcePath.ROOT.path + LAppDefine.ResourcePath.POWER_IMAGE.path)
         
         if (powerTexture != null) {
-            x = windowWidth - powerTexture.width * 0.5f - 96.0f
+            x = windowWidth - powerTexture.width * 0.5f - LAppDefine.UILayout.POWER_BUTTON_MARGIN
             y = powerTexture.height * 0.5f
             val powerWidth = powerTexture.width.toFloat()
             val powerHeight = powerTexture.height.toFloat()

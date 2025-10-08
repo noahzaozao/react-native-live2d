@@ -87,7 +87,11 @@ class GLRenderer : GLSurfaceView.Renderer {
         }
     }
 
-    private fun retrySurfaceChanged(width: Int, height: Int, attempts: Int = 3) {
+    private fun retrySurfaceChanged(
+        width: Int,
+        height: Int,
+        attempts: Int = LAppDefine.UILayout.SURFACE_INIT_RETRY_ATTEMPTS
+    ) {
         var remaining = attempts
         val handler = Handler(Looper.getMainLooper())
         
@@ -104,7 +108,7 @@ class GLRenderer : GLSurfaceView.Renderer {
                     delegate.onSurfaceChanged(width, height)
                 } else if (remaining > 0) {
                     remaining--
-                    handler.postDelayed(this, 100)
+                    handler.postDelayed(this, LAppDefine.UILayout.SURFACE_INIT_RETRY_DELAY_MS)
                 } else {
                     Log.w("GLRenderer", "Retry failed: View still null after $attempts attempts")
                 }

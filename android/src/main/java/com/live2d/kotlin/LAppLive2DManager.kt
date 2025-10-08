@@ -298,19 +298,20 @@ class LAppLive2DManager private constructor() {
         private val finishedMotion = FinishedMotion()
 
         /**
-         * シングルトンインスタンス
+         * シングルトンインスタンス - 使用 lazy 委托确保线程安全
          */
-        private var s_instance: LAppLive2DManager? = null
-
-        fun getInstance(): LAppLive2DManager {
-            if (s_instance == null) {
-                s_instance = LAppLive2DManager()
-            }
-            return s_instance!!
+        private val _instance: LAppLive2DManager by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
+            LAppLive2DManager()
         }
 
+        fun getInstance(): LAppLive2DManager = _instance
+
+        /**
+         * 释放所有模型（清理模型列表）
+         * 注意：由于使用 lazy 委托，单例实例本身不能被释放
+         */
         fun releaseInstance() {
-            s_instance = null
+            _instance.releaseAllModel()
         }
     }
 }

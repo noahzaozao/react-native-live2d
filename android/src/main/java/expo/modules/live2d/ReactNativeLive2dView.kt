@@ -191,6 +191,15 @@ class ReactNativeLive2dView(context: Context, appContext: AppContext) :
         handler.post(checker)
     }
 
+    /**
+     * Load a Live2D model from the specified file path
+     * 
+     * @param modelPath Full path to the model3.json file (supports file:// URI)
+     * 
+     * Thread safety: This method queues GL operations and is safe to call from any thread
+     * 
+     * Note: Duplicate calls with the same path will be skipped automatically
+     */
     fun loadModel(modelPath: String) {
         Log.d(TAG, "loadModel: $modelPath")
 
@@ -476,6 +485,15 @@ class ReactNativeLive2dView(context: Context, appContext: AppContext) :
         live2dManager = null
     }
 
+    /**
+     * Start playing a motion animation
+     * 
+     * @param motionGroup Motion group name (e.g., "Idle", "TapBody")
+     * @param motionIndex Motion index within the group (0-based)
+     * 
+     * Note: Motions are queued and played sequentially to prevent conflicts
+     * Duplicate requests are automatically filtered
+     */
     fun startMotion(motionGroup: String, motionIndex: Int) {
         Log.d(TAG, "startMotion $motionGroup[$motionIndex]")
 
@@ -621,6 +639,13 @@ class ReactNativeLive2dView(context: Context, appContext: AppContext) :
         }
     }
 
+    /**
+     * Set the model's scale (uniform scaling)
+     * 
+     * @param scale Scaling factor (1.0 = 100%, must be > 0)
+     * 
+     * Thread safety: GL operations are queued automatically
+     */
     fun setScale(scale: Float) {
         Log.d(TAG, "setScale $scale")
 
@@ -653,6 +678,14 @@ class ReactNativeLive2dView(context: Context, appContext: AppContext) :
         }
     }
 
+    /**
+     * Set the model's position offset
+     * 
+     * @param x X offset in logical coordinates (center is 0, right is positive)
+     * @param y Y offset in logical coordinates (center is 0, up is positive)
+     * 
+     * Thread safety: GL operations are queued automatically
+     */
     fun setPosition(x: Float, y: Float) {
         Log.d(TAG, "setPosition ($x, $y)")
 
