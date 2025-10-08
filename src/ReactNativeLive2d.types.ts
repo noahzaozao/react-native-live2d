@@ -105,10 +105,4 @@ export interface Live2DModule {
    * @param expressionId 表情 ID
    */
   setExpression(expressionId: string): Promise<boolean>;
-  
-  /**
-   * 切换场景
-   * @param modelIndex 模型索引
-   */
-  changeScene(modelIndex: number): Promise<boolean>;
 }

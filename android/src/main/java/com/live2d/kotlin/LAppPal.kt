@@ -16,10 +16,12 @@ import java.io.InputStream
 
 object LAppPal {
     private const val TAG = "Live2DDemoApp"
+    private const val MAX_FILE_SIZE = Int.MAX_VALUE.toLong() // 2GB limit for ByteArray
     
-    private var s_currentFrame = 0L
-    private var _lastNanoTime = getSystemNanoTime()
-    private var _deltaNanoTime = 0L
+    // 使用 @Volatile 确保多线程可见性
+    @Volatile private var currentFrame = 0L
+    @Volatile private var lastNanoTime = getSystemNanoTime()
+    @Volatile private var deltaNanoTime = 0L
 
     /**
      * Logging Function class to be registered in the CubismFramework's logging function.
@@ -36,56 +38,50 @@ object LAppPal {
     }
 
     // デルタタイムの更新
+    @Synchronized
     fun updateTime() {
-        s_currentFrame = getSystemNanoTime()
-        _deltaNanoTime = s_currentFrame - _lastNanoTime
-        _lastNanoTime = s_currentFrame
+        currentFrame = getSystemNanoTime()
+        deltaNanoTime = currentFrame - lastNanoTime
+        lastNanoTime = currentFrame
     }
 
     // ファイルをバイト列として読み込む
     fun loadFileAsBytes(path: String): ByteArray {
-        var fileData: InputStream? = null
         return try {
-            fileData = LAppDelegate.getInstance().getActivity()?.assets?.open(path)
-                ?: return byteArrayOf()
-
-            val fileSize = fileData.available()
-            val fileBuffer = ByteArray(fileSize)
-            fileData.read(fileBuffer, 0, fileSize)
-
-            fileBuffer
-        } catch (e: IOException) {
-            e.printStackTrace()
-
-            if (LAppDefine.DEBUG_LOG_ENABLE) {
-                printLog("File open error.")
-            }
-
-            byteArrayOf()
-        } finally {
-            try {
-                fileData?.close()
-            } catch (e: IOException) {
-                e.printStackTrace()
-
+            val inputStream = LAppDelegate.getInstance().getActivity()?.assets?.open(path)
+            if (inputStream == null) {
                 if (LAppDefine.DEBUG_LOG_ENABLE) {
-                    printLog("File close error.")
+                    printLog("Failed to open asset file: $path (Activity or Assets is null)")
                 }
+                return byteArrayOf()
             }
+            
+            inputStream.use { fileData ->
+                val fileBuffer = ByteArray(fileData.available())
+                fileData.read(fileBuffer)
+                fileBuffer
+            }
+        } catch (e: IOException) {
+            if (LAppDefine.DEBUG_LOG_ENABLE) {
+                printLog("File read error: $path - ${e.message}")
+                e.printStackTrace()
+            }
+            byteArrayOf()
         }
     }
 
     // デルタタイム(前回フレームとの差分)を取得する
     fun getDeltaTime(): Float {
         // ナノ秒を秒に変換
-        return (_deltaNanoTime / 1000000000.0f)
+        return (deltaNanoTime / 1000000000.0f)
     }
 
     // ファイルシステムからファイルをバイト列として読み込む
     fun loadFileFromFileSystem(filePath: String): ByteArray {
-        var fileData: FileInputStream? = null
         return try {
             val file = File(filePath)
+            
+            // 文件存在性检查
             if (!file.exists()) {
                 if (LAppDefine.DEBUG_LOG_ENABLE) {
                     printLog("File not found: $filePath")
@@ -93,30 +89,27 @@ object LAppPal {
                 return byteArrayOf()
             }
 
-            fileData = FileInputStream(file)
-            val fileSize = file.length().toInt()
-            val fileBuffer = ByteArray(fileSize)
-            fileData.read(fileBuffer, 0, fileSize)
-
-            fileBuffer
-        } catch (e: IOException) {
-            e.printStackTrace()
-
-            if (LAppDefine.DEBUG_LOG_ENABLE) {
-                printLog("File read error: $filePath")
-            }
-
-            byteArrayOf()
-        } finally {
-            try {
-                fileData?.close()
-            } catch (e: IOException) {
-                e.printStackTrace()
-
+            // 文件大小检查（防止整数溢出）
+            val fileLength = file.length()
+            if (fileLength > MAX_FILE_SIZE) {
                 if (LAppDefine.DEBUG_LOG_ENABLE) {
-                    printLog("File close error: $filePath")
+                    printLog("File too large: $filePath (${fileLength} bytes, max: $MAX_FILE_SIZE bytes)")
                 }
+                return byteArrayOf()
             }
+
+            // 使用 use 函数自动关闭流
+            FileInputStream(file).use { fileData ->
+                val fileBuffer = ByteArray(fileLength.toInt())
+                fileData.read(fileBuffer)
+                fileBuffer
+            }
+        } catch (e: IOException) {
+            if (LAppDefine.DEBUG_LOG_ENABLE) {
+                printLog("File read error: $filePath - ${e.message}")
+                e.printStackTrace()
+            }
+            byteArrayOf()
         }
     }
 

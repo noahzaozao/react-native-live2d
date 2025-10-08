@@ -288,19 +288,5 @@ class ReactNativeLive2dModule : Module() {
                 promise.reject("EXPRESSION_ERROR", "Failed to set expression: ${e.message}", e)
             }
         }
-
-        AsyncFunction("changeScene") { modelIndex: Int, promise: Promise ->
-            try {
-                Log.d(TAG, "Changing scene to model index: $modelIndex")
-
-                val manager = LAppLive2DManager.getInstance()
-                manager.changeScene(modelIndex)
-
-                promise.resolve(true)
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to change scene: ${e.message}")
-                promise.reject("SCENE_CHANGE_ERROR", "Failed to change scene: ${e.message}", e)
-            }
-        }
     }
 }

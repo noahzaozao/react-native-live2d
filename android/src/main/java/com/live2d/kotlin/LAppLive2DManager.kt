@@ -15,6 +15,7 @@ import com.live2d.sdk.cubism.framework.math.CubismMatrix44
 import com.live2d.sdk.cubism.framework.motion.ACubismMotion
 import com.live2d.sdk.cubism.framework.motion.IBeganMotionCallback
 import com.live2d.sdk.cubism.framework.motion.IFinishedMotionCallback
+import java.util.Collections
 
 /**
  * サンプルアプリケーションにおいてCubismModelを管理するクラス。
@@ -22,17 +23,8 @@ import com.live2d.sdk.cubism.framework.motion.IFinishedMotionCallback
  */
 class LAppLive2DManager private constructor() {
     
-    private val models: MutableList<LAppModel> = ArrayList()
-
-    /**
-     * 表示するシーンのインデックス値
-     */
-    private var currentModel: Int = 0
-
-    /**
-     * モデルディレクトリ名
-     */
-    private val modelDir: MutableList<String> = ArrayList()
+    // 使用线程安全的列表来避免多线程并发问题
+    private val models: MutableList<LAppModel> = Collections.synchronizedList(ArrayList())
 
     // onUpdateメソッドで使用されるキャッシュ変数
     private val viewMatrix = CubismMatrix44.create()
@@ -83,19 +75,14 @@ class LAppLive2DManager private constructor() {
             projection.loadIdentity()
 
             if (model.model!!.canvasWidth > 1.0f && width < height) {
-                if (model.modelMatrix != null) {
-                    model.modelMatrix!!.setWidth(2.0f)
-                } else {
-                }
+                model.modelMatrix?.setWidth(2.0f)
                 projection.scale(1.0f, width.toFloat() / height.toFloat())
             } else {
                 projection.scale(height.toFloat() / width.toFloat(), 1.0f)
             }
 
             // 必要があればここで乗算する
-            if (viewMatrix != null) {
-                viewMatrix.multiplyByMatrix(projection)
-            }
+            viewMatrix.multiplyByMatrix(projection)
 
             projection.translateRelative(userOffsetX, userOffsetY)
             projection.scaleRelative(userScale, userScale)
@@ -116,11 +103,8 @@ class LAppLive2DManager private constructor() {
      * 设置用户期望的等比缩放比例
      */
     fun setUserScale(scale: Float) {
-        if (scale <= 0.0f) {
-            return
-        }
-        // 可根据需要做 clamp，这里保持直接赋值
-        userScale = scale
+        // 限制缩放范围在 0.1 到 10.0 之间
+        userScale = scale.coerceIn(0.1f, 10.0f)
     }
 
     /**
@@ -168,42 +152,12 @@ class LAppLive2DManager private constructor() {
             // 体をタップした場合ランダムモーションを開始する
             else if (model.hitTest(LAppDefine.HitAreaName.BODY.id, x, y)) {
                 if (LAppDefine.DEBUG_LOG_ENABLE) {
-                    LAppPal.printLog("hit area: ${LAppDefine.HitAreaName.HEAD.id}")
+                    LAppPal.printLog("hit area: ${LAppDefine.HitAreaName.BODY.id}")
                 }
 
                 model.startRandomMotion(LAppDefine.MotionGroup.TAP_BODY.id, LAppDefine.Priority.NORMAL.priority, finishedMotion, beganMotion)
             }
         }
-    }
-
-    /**
-     * 次のシーンに切り替える（已弃用 - 现在统一使用文件系统路径）
-     */
-    @Deprecated("Use file system paths with addModel() instead")
-    fun nextScene() {
-        if (LAppDefine.DEBUG_LOG_ENABLE) {
-            LAppPal.printLog("nextScene: This method is deprecated. Use file system paths with addModel() instead.")
-        }
-        // 不再支持场景切换，因为不再使用assets模型列表
-        LAppPal.printLog("nextScene: Scene switching is no longer supported. Please use file system paths.")
-    }
-
-    /**
-     * シーンを切り替える（已弃用 - 现在统一使用文件系统路径）
-     */
-    @Deprecated("Use file system paths with addModel() instead")
-    fun changeScene(index: Int) {
-        if (LAppDefine.DEBUG_LOG_ENABLE) {
-            LAppPal.printLog("changeScene: This method is deprecated. Use file system paths with addModel() instead.")
-            // 打印调用栈来追踪changeScene调用来源
-            val stackTrace = Thread.currentThread().stackTrace
-            for (i in 0 until minOf(5, stackTrace.size)) {
-                LAppPal.printLog("changeScene: Stack[$i]: ${stackTrace[i]}")
-            }
-        }
-
-        // 不再支持从assets加载模型，直接返回
-        LAppPal.printLog("changeScene: Assets loading is no longer supported. Please use file system paths.")
     }
 
     /**
@@ -230,16 +184,6 @@ class LAppLive2DManager private constructor() {
     }
 
     /**
-     * シーンインデックスを返す
-     *
-     * @return シーンインデックス
-     */
-    fun getCurrentModel(): Int {
-        return currentModel
-    }
-
-
-    /**
      * Add a model to the manager
      *
      * @param model The model to add
@@ -247,7 +191,7 @@ class LAppLive2DManager private constructor() {
     fun addModel(model: LAppModel) {
         if (LAppDefine.DEBUG_LOG_ENABLE) {
             LAppPal.printLog("addModel: Starting - Thread: ${Thread.currentThread().name}")
-            LAppPal.printLog("addModel: Model parameter: ${if (model != null) "not null" else "null"}")
+            LAppPal.printLog("addModel: Model parameter: not null")
             LAppPal.printLog("addModel: Models list: not null")
             LAppPal.printLog("addModel: Adding model, current count: ${models.size}")
             // 打印调用栈来追踪模型创建来源

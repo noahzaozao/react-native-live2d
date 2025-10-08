@@ -133,9 +133,7 @@ class LAppDelegate private constructor() {
         }
     }
 
-    fun onPause() {
-        currentModel = LAppLive2DManager.getInstance().getCurrentModel()
-    }
+    fun onPause() {}
 
     fun onStop() {
         if (LAppDefine.DEBUG_LOG_ENABLE) {
