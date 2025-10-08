@@ -104,9 +104,9 @@ class LAppModel : CubismUserModel() {
     private val renderingBuffer = CubismOffscreenSurfaceAndroid()
     
     /**
-     * 延迟绑定的纹理信息
+     * 延迟绑定的纹理信息（线程安全）
      */
-    private val pendingTextures: MutableMap<Int, Int> = mutableMapOf()
+    private val pendingTextures: MutableMap<Int, Int> = java.util.Collections.synchronizedMap(mutableMapOf())
 
     init {
         // TODO: Fix ConsistencyValidationStrategy access
@@ -229,49 +229,119 @@ class LAppModel : CubismUserModel() {
         }
         
         try {
-            // 清理离屏渲染缓冲
-            renderingBuffer.destroyOffscreenSurface()
+            // 1. 停止所有动作（优先停止，避免后续访问已清理的资源）
+            try {
+                motionManager.stopAllMotions()
+                if (LAppDefine.DEBUG_LOG_ENABLE) {
+                    LAppPal.printLog("deleteModel: Motion manager stopped")
+                }
+            } catch (e: Exception) {
+                LAppPal.printLog("deleteModel: Error stopping motions: ${e.message}")
+            }
             
-            // 清空待绑定纹理
+            // 2. 清理表情和动作缓存
+            synchronized(expressions) {
+                expressions.clear()
+            }
+            synchronized(motions) {
+                motions.clear()
+            }
+            if (LAppDefine.DEBUG_LOG_ENABLE) {
+                LAppPal.printLog("deleteModel: Expressions and motions cleared")
+            }
+            
+            // 3. 清理离屏渲染缓冲
+            try {
+                renderingBuffer.destroyOffscreenSurface()
+                if (LAppDefine.DEBUG_LOG_ENABLE) {
+                    LAppPal.printLog("deleteModel: Rendering buffer destroyed")
+                }
+            } catch (e: Exception) {
+                LAppPal.printLog("deleteModel: Error destroying rendering buffer: ${e.message}")
+            }
+            
+            // 4. 清空待绑定纹理（已是线程安全的集合）
             pendingTextures.clear()
+            if (LAppDefine.DEBUG_LOG_ENABLE) {
+                LAppPal.printLog("deleteModel: Pending textures cleared")
+            }
             
-            // 停止所有动作
-            motionManager.stopAllMotions()
+            // 5. 释放效果系统资源
+            eyeBlink = null
+            breath = null
+            pose = null
+            physics = null
+            if (LAppDefine.DEBUG_LOG_ENABLE) {
+                LAppPal.printLog("deleteModel: Effect systems released")
+            }
             
-            // 清理表情和动作缓存
-            expressions.clear()
-            motions.clear()
+            // 6. 清空参数ID列表
+            eyeBlinkIds.clear()
+            lipSyncIds.clear()
+            if (LAppDefine.DEBUG_LOG_ENABLE) {
+                LAppPal.printLog("deleteModel: Parameter ID lists cleared")
+            }
+            
+            // 7. 清理模型设置（保留 modelHomeDirectory 以便调试）
+            modelSetting = null
+            if (LAppDefine.DEBUG_LOG_ENABLE) {
+                LAppPal.printLog("deleteModel: Model settings cleared")
+            }
+            
+            // 注意：纹理资源由 LAppTextureManager 统一管理，在 LAppDelegate.onStop() 中释放
+            // 这里不直接删除纹理，避免影响其他可能共享纹理的模型
             
             if (LAppDefine.DEBUG_LOG_ENABLE) {
-                LAppPal.printLog("deleteModel: Model cleanup completed")
+                LAppPal.printLog("deleteModel: Model cleanup completed successfully")
             }
         } catch (e: Exception) {
-            LAppPal.printLog("deleteModel: Error during cleanup: ${e.message}")
+            LAppPal.printLog("deleteModel: Unexpected error during cleanup: ${e.message}")
             e.printStackTrace()
         }
     }
     
     /**
-     * 绑定延迟的纹理
+     * 绑定延迟的纹理（线程安全）
      */
     fun bindPendingTextures() {
+        // 先检查是否为空，避免不必要的同步开销
         if (pendingTextures.isEmpty()) {
             return
         }
         
         val renderer = getRenderer<CubismRendererAndroid>()
         if (renderer != null) {
-            LAppPal.printLogLazy { "bindPendingTextures: Binding ${pendingTextures.size} pending textures" }
-            
-            // 只需要设置一次 premultiplied alpha，而不是每个纹理都设置
-            renderer.isPremultipliedAlpha(LAppDefine.PREMULTIPLIED_ALPHA_ENABLE)
-            
-            for ((modelTextureNumber, glTextureNumber) in pendingTextures) {
-                renderer.bindTexture(modelTextureNumber, glTextureNumber)
-                LAppPal.printLogLazy { "bindPendingTextures: Texture $modelTextureNumber bound successfully" }
+            // 创建待绑定纹理的快照，减少同步块持有时间
+            val texturesToBind: Map<Int, Int> = synchronized(pendingTextures) {
+                if (pendingTextures.isEmpty()) {
+                    return  // 双重检查，避免竞态条件
+                }
+                LAppPal.printLogLazy { "bindPendingTextures: Binding ${pendingTextures.size} pending textures" }
+                HashMap(pendingTextures)
             }
-            pendingTextures.clear()
-            LAppPal.printLogLazy { "bindPendingTextures: All pending textures bound successfully" }
+            
+            // 在同步块外执行绑定操作（GL 调用可能耗时）
+            try {
+                // 只需要设置一次 premultiplied alpha，而不是每个纹理都设置
+                renderer.isPremultipliedAlpha(LAppDefine.PREMULTIPLIED_ALPHA_ENABLE)
+                
+                for ((modelTextureNumber, glTextureNumber) in texturesToBind) {
+                    renderer.bindTexture(modelTextureNumber, glTextureNumber)
+                    LAppPal.printLogLazy { "bindPendingTextures: Texture $modelTextureNumber bound successfully" }
+                }
+                
+                // 清除已成功绑定的纹理
+                synchronized(pendingTextures) {
+                    for (key in texturesToBind.keys) {
+                        pendingTextures.remove(key)
+                    }
+                }
+                
+                LAppPal.printLogLazy { "bindPendingTextures: All pending textures bound successfully" }
+            } catch (e: Exception) {
+                LAppPal.printLog("bindPendingTextures: Error binding textures: ${e.message}")
+                e.printStackTrace()
+            }
         } else {
             LAppPal.printLog("bindPendingTextures: Renderer is still null, cannot bind pending textures")
             // 尝试初始化渲染器
