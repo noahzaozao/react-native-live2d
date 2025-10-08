@@ -220,9 +220,35 @@ class LAppModel : CubismUserModel() {
         }
     }
 
+    /**
+     * 释放模型资源
+     */
     fun deleteModel() {
-        renderingBuffer.destroyOffscreenSurface()
-        pendingTextures.clear()
+        if (LAppDefine.DEBUG_LOG_ENABLE) {
+            LAppPal.printLog("deleteModel: Starting model cleanup")
+        }
+        
+        try {
+            // 清理离屏渲染缓冲
+            renderingBuffer.destroyOffscreenSurface()
+            
+            // 清空待绑定纹理
+            pendingTextures.clear()
+            
+            // 停止所有动作
+            motionManager.stopAllMotions()
+            
+            // 清理表情和动作缓存
+            expressions.clear()
+            motions.clear()
+            
+            if (LAppDefine.DEBUG_LOG_ENABLE) {
+                LAppPal.printLog("deleteModel: Model cleanup completed")
+            }
+        } catch (e: Exception) {
+            LAppPal.printLog("deleteModel: Error during cleanup: ${e.message}")
+            e.printStackTrace()
+        }
     }
     
     /**
@@ -235,14 +261,17 @@ class LAppModel : CubismUserModel() {
         
         val renderer = getRenderer<CubismRendererAndroid>()
         if (renderer != null) {
-            LAppPal.printLog("bindPendingTextures: Binding ${pendingTextures.size} pending textures")
+            LAppPal.printLogLazy { "bindPendingTextures: Binding ${pendingTextures.size} pending textures" }
+            
+            // 只需要设置一次 premultiplied alpha，而不是每个纹理都设置
+            renderer.isPremultipliedAlpha(LAppDefine.PREMULTIPLIED_ALPHA_ENABLE)
+            
             for ((modelTextureNumber, glTextureNumber) in pendingTextures) {
                 renderer.bindTexture(modelTextureNumber, glTextureNumber)
-                renderer.isPremultipliedAlpha(LAppDefine.PREMULTIPLIED_ALPHA_ENABLE)
-                LAppPal.printLog("bindPendingTextures: Texture $modelTextureNumber bound successfully")
+                LAppPal.printLogLazy { "bindPendingTextures: Texture $modelTextureNumber bound successfully" }
             }
             pendingTextures.clear()
-            LAppPal.printLog("bindPendingTextures: All pending textures bound successfully")
+            LAppPal.printLogLazy { "bindPendingTextures: All pending textures bound successfully" }
         } else {
             LAppPal.printLog("bindPendingTextures: Renderer is still null, cannot bind pending textures")
             // 尝试初始化渲染器
@@ -547,8 +576,11 @@ class LAppModel : CubismUserModel() {
         if (pendingTextures.isNotEmpty()) {
             try {
                 bindPendingTextures()
-            } catch (_: Exception) {
-                // 忽略单帧失败，后续帧继续尝试
+            } catch (e: Exception) {
+                // 记录错误但不中断渲染，后续帧继续尝试
+                if (LAppDefine.DEBUG_LOG_ENABLE) {
+                    LAppPal.printLog("draw: Failed to bind pending textures: ${e.message}")
+                }
             }
         }
 

@@ -132,12 +132,10 @@ class LAppTextureManager {
         var stream: FileInputStream? = null
         try {
             val file = File(filePath)
-            if (LAppDefine.DEBUG_LOG_ENABLE) {
-                LAppPal.printLog("createTextureFromFileSystem: File exists check - ${file.exists()} for $filePath")
-                LAppPal.printLog("createTextureFromFileSystem: File absolute path - ${file.absolutePath}")
-                LAppPal.printLog("createTextureFromFileSystem: File can read - ${file.canRead()}")
-                LAppPal.printLog("createTextureFromFileSystem: File size - ${file.length()} bytes")
-            }
+            LAppPal.printLogLazy { "createTextureFromFileSystem: File exists check - ${file.exists()} for $filePath" }
+            LAppPal.printLogLazy { "createTextureFromFileSystem: File absolute path - ${file.absolutePath}" }
+            LAppPal.printLogLazy { "createTextureFromFileSystem: File can read - ${file.canRead()}" }
+            LAppPal.printLogLazy { "createTextureFromFileSystem: File size - ${file.length()} bytes" }
             if (!file.exists()) {
                 if (LAppDefine.DEBUG_LOG_ENABLE) {
                     LAppPal.printLog("createTextureFromFileSystem: Texture file not found: $filePath")
@@ -181,18 +179,14 @@ class LAppTextureManager {
             }
             e.printStackTrace()
         }
-
+        
         if (bitmap == null) {
-            if (LAppDefine.DEBUG_LOG_ENABLE) {
-                LAppPal.printLog("createTextureFromFileSystem: Failed to decode bitmap from: $filePath")
-                LAppPal.printLog("createTextureFromFileSystem: BitmapFactory.decodeStream returned null")
-            }
+            LAppPal.printLogLazy { "createTextureFromFileSystem: Failed to decode bitmap from: $filePath" }
+            LAppPal.printLogLazy { "createTextureFromFileSystem: BitmapFactory.decodeStream returned null" }
             return null
         }
         
-        if (LAppDefine.DEBUG_LOG_ENABLE) {
-            LAppPal.printLog("createTextureFromFileSystem: Bitmap decoded successfully - Size: ${bitmap.width}x${bitmap.height}")
-        }
+        LAppPal.printLogLazy { "createTextureFromFileSystem: Bitmap decoded successfully - Size: ${bitmap.width}x${bitmap.height}" }
 
         // Texture0をアクティブにする
         GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
@@ -236,19 +230,42 @@ class LAppTextureManager {
      * 释放由本管理器创建的所有 OpenGL 纹理。需在 GL 线程调用。
      */
     fun dispose() {
-        if (textures.isEmpty()) return
+        if (textures.isEmpty()) {
+            if (LAppDefine.DEBUG_LOG_ENABLE) {
+                LAppPal.printLog("dispose: No textures to dispose")
+            }
+            return
+        }
+        
+        if (LAppDefine.DEBUG_LOG_ENABLE) {
+            LAppPal.printLog("dispose: Disposing ${textures.size} textures")
+        }
+        
         try {
             val ids = IntArray(textures.size)
             for (i in textures.indices) {
                 ids[i] = textures[i].id
             }
+            
             if (ids.isNotEmpty()) {
                 GLES20.glDeleteTextures(ids.size, ids, 0)
+                
+                // 检查 OpenGL 错误
+                val error = GLES20.glGetError()
+                if (error != GLES20.GL_NO_ERROR) {
+                    LAppPal.printLog("dispose: Failed to delete textures, GL error: $error")
+                } else if (LAppDefine.DEBUG_LOG_ENABLE) {
+                    LAppPal.printLog("dispose: Successfully deleted ${ids.size} textures")
+                }
             }
-        } catch (_: Exception) {
-            // 忽略清理异常
+        } catch (e: Exception) {
+            LAppPal.printLog("dispose: Exception during texture disposal: ${e.message}")
+            e.printStackTrace()
         } finally {
             textures.clear()
+            if (LAppDefine.DEBUG_LOG_ENABLE) {
+                LAppPal.printLog("dispose: Texture list cleared")
+            }
         }
     }
 }

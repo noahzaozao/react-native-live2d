@@ -432,10 +432,14 @@ class ReactNativeLive2dView(context: Context, appContext: AppContext) :
                     glSurfaceView.queueEvent {
                         try {
                             tm.dispose()
-                        } catch (_: Exception) {}
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Failed to dispose textures: ${e.message}")
+                        }
                     }
                 }
-            } catch (_: Exception) {}
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to access texture manager: ${e.message}")
+            }
             // 然后再调用 onStop 做框架级清理
             delegate.onStop()
             Log.d(TAG, "onDetachedFromWindow: called delegate.onStop()")
@@ -456,7 +460,9 @@ class ReactNativeLive2dView(context: Context, appContext: AppContext) :
             // 在 GL 线程上清空 renderer 相关引用（若有内部状态）
             try {
                 glSurfaceView.queueEvent { /* no-op hook to ensure prior GL tasks flushed */}
-            } catch (_: Exception) {}
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to queue GL flush event: ${e.message}")
+            }
             // 注意：GLSurfaceView 一旦设置过渲染器就不能再设置为 null，只能暂停
             // 这里我们只暂停渲染，不尝试 unset renderer
             Log.d(TAG, "onDetachedFromWindow: GLSurfaceView renderer kept (cannot unset)")

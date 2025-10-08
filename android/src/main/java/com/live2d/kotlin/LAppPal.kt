@@ -128,6 +128,18 @@ object LAppPal {
     fun printLog(message: String) {
         Log.d(TAG, message)
     }
+    
+    /**
+     * Logging function with lazy evaluation
+     * Only constructs the message string if debug logging is enabled
+     *
+     * @param messageProvider lambda that provides the log message
+     */
+    fun printLogLazy(messageProvider: () -> String) {
+        if (LAppDefine.DEBUG_LOG_ENABLE) {
+            Log.d(TAG, messageProvider())
+        }
+    }
 
     private fun getSystemNanoTime(): Long {
         return System.nanoTime()

@@ -11,18 +11,18 @@ import android.opengl.GLSurfaceView
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 
 class GLRenderer : GLSurfaceView.Renderer {
 
-    @Volatile
-    private var isShuttingDown = false
+    private val isShuttingDown = AtomicBoolean(false)
     
     // 每次获取最新的 delegate 实例，而不是缓存
     private fun getDelegate(): LAppDelegate? {
         return try {
-            if (isShuttingDown) {
+            if (isShuttingDown.get()) {
                 null
             } else {
                 LAppDelegate.getInstance()
@@ -37,7 +37,7 @@ class GLRenderer : GLSurfaceView.Renderer {
      * 通知渲染器即将关闭，停止所有渲染操作
      */
     fun shutdown() {
-        isShuttingDown = true
+        isShuttingDown.set(true)
         Log.d("GLRenderer", "Renderer shutdown initiated")
     }
     
@@ -45,13 +45,13 @@ class GLRenderer : GLSurfaceView.Renderer {
      * 重置渲染器状态，允许重新使用
      */
     fun reset() {
-        isShuttingDown = false
+        isShuttingDown.set(false)
         Log.d("GLRenderer", "Renderer reset, ready for reuse")
     }
     
     // Called at initialization (when the drawing context is lost and recreated).
     override fun onSurfaceCreated(unused: GL10?, config: EGLConfig?) {
-        if (isShuttingDown) {
+        if (isShuttingDown.get()) {
             Log.d("GLRenderer", "onSurfaceCreated skipped: renderer is shutting down")
             return
         }
@@ -66,7 +66,7 @@ class GLRenderer : GLSurfaceView.Renderer {
 
     // Mainly called when switching between landscape and portrait.
     override fun onSurfaceChanged(unused: GL10?, width: Int, height: Int) {
-        if (isShuttingDown) {
+        if (isShuttingDown.get()) {
             Log.d("GLRenderer", "onSurfaceChanged skipped: renderer is shutting down")
             return
         }
@@ -93,7 +93,7 @@ class GLRenderer : GLSurfaceView.Renderer {
         
         val runnable = object : Runnable {
             override fun run() {
-                if (isShuttingDown) {
+                if (isShuttingDown.get()) {
                     Log.d("GLRenderer", "Retry cancelled: renderer is shutting down")
                     return
                 }
@@ -116,7 +116,7 @@ class GLRenderer : GLSurfaceView.Renderer {
 
     // Called repeatedly for drawing.
     override fun onDrawFrame(unused: GL10?) {
-        if (isShuttingDown) {
+        if (isShuttingDown.get()) {
             // 静默跳过，避免日志刷屏
             return
         }
@@ -127,12 +127,12 @@ class GLRenderer : GLSurfaceView.Renderer {
                 delegate.run()
             } else {
                 // 只在非关闭状态下记录警告
-                if (!isShuttingDown) {
+                if (!isShuttingDown.get()) {
                     Log.w("GLRenderer", "onDrawFrame skipped: delegate view is null")
                 }
             }
         } catch (e: Exception) {
-            if (!isShuttingDown) {
+            if (!isShuttingDown.get()) {
                 Log.e("GLRenderer", "Error in onDrawFrame: ${e.message}", e)
             }
         }

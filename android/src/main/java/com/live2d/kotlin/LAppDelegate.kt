@@ -16,25 +16,27 @@ import com.live2d.sdk.cubism.framework.CubismFramework
 class LAppDelegate private constructor() {
     
     companion object {
-        @Volatile
-        private var s_instance: LAppDelegate? = null
-        
-        fun getInstance(): LAppDelegate {
-            return s_instance ?: synchronized(this) {
-                s_instance ?: LAppDelegate().also { s_instance = it }
-            }
+        // 使用 lazy 委托确保线程安全的单例初始化
+        // 注意：属性名使用下划线前缀避免与 getInstance() 方法的 JVM 签名冲突
+        private val _instance: LAppDelegate by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
+            LAppDelegate()
         }
+        
+        fun getInstance(): LAppDelegate = _instance
 
         /**
          * クラスのインスタンス（シングルトン）を解放する。
          * 注意：调用此方法前必须确保所有 GL 回调已停止
+         * 警告：由于使用了 lazy 委托，实例在 JVM 生命周期内会持续存在
+         * 这个方法主要用于标记关闭状态，而非真正释放实例
          */
+        @Deprecated(
+            message = "Singleton instance cannot be truly released due to lazy initialization",
+            replaceWith = ReplaceWith("getInstance().markAsShuttingDown()")
+        )
         fun releaseInstance() {
             synchronized(this) {
-                s_instance?.let {
-                    it.isShuttingDown = true
-                }
-                s_instance = null
+                _instance.isShuttingDown = true
             }
         }
     }
@@ -90,6 +92,24 @@ class LAppDelegate private constructor() {
     fun deactivateApp() {
         isActive = false
     }
+    
+    /**
+     * 标记实例为关闭状态
+     */
+    fun markAsShuttingDown() {
+        synchronized(this) {
+            isShuttingDown = true
+        }
+    }
+    
+    /**
+     * 检查是否正在关闭
+     */
+    fun isShuttingDown(): Boolean {
+        synchronized(this) {
+            return isShuttingDown
+        }
+    }
 
     fun onStart(activity: Activity) {
         if (LAppDefine.DEBUG_LOG_ENABLE) {
@@ -97,7 +117,9 @@ class LAppDelegate private constructor() {
         }
         
         // 重置关闭标志，允许重新使用
-        isShuttingDown = false
+        synchronized(this) {
+            isShuttingDown = false
+        }
         
         textureManager = LAppTextureManager()
         view = LAppView()
@@ -121,7 +143,7 @@ class LAppDelegate private constructor() {
         }
         
         // 标记正在关闭，阻止新的操作
-        isShuttingDown = true
+        markAsShuttingDown()
         
         view?.let {
             it.close()
@@ -196,7 +218,7 @@ class LAppDelegate private constructor() {
 
     fun run() {
         // 如果正在关闭，停止渲染
-        if (isShuttingDown) {
+        if (isShuttingDown()) {
             return
         }
         
@@ -226,7 +248,7 @@ class LAppDelegate private constructor() {
         if (view == null) {
             return
         }
-        if (isShuttingDown) return
+        if (isShuttingDown()) return
         
         mouseX = x
         mouseY = y
@@ -238,7 +260,7 @@ class LAppDelegate private constructor() {
     }
 
     fun onTouchEnd(x: Float, y: Float) {
-        if (isShuttingDown) return
+        if (isShuttingDown()) return
         
         mouseX = x
         mouseY = y
@@ -250,7 +272,7 @@ class LAppDelegate private constructor() {
     }
 
     fun onTouchMoved(x: Float, y: Float) {
-        if (isShuttingDown) return
+        if (isShuttingDown()) return
         
         mouseX = x
         mouseY = y

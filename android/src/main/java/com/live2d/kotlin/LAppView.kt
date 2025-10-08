@@ -455,7 +455,7 @@ class LAppView : AutoCloseable {
         // 論理座標変換した座標を取得
         val screenY = deviceToScreen.transformY(deviceY)
         // 拡大、縮小、移動後の値
-        return viewMatrix.invertTransformX(screenY)
+        return viewMatrix.invertTransformY(screenY)
     }
 
     /**
