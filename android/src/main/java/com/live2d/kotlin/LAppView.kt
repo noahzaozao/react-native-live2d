@@ -38,7 +38,15 @@ class LAppView : AutoCloseable {
     }
 
     override fun close() {
+        // 清理 shader（LAppSpriteShader 实现了 AutoCloseable）
         spriteShader?.close()
+        spriteShader = null
+        
+        // 释放 sprite 引用（它们本身不需要 close，纹理由 TextureManager 管理）
+        backSprite = null
+        gearSprite = null
+        powerSprite = null
+        renderingSprite = null
     }
 
     // ビューを初期化する
@@ -201,17 +209,9 @@ class LAppView : AutoCloseable {
 
     // 描画する
     fun render() {
-        // if (LAppDefine.DEBUG_LOG_ENABLE) {
-        //     android.util.Log.d("LAppView", "render: Starting render process")
-        // }
-        
         // 画面サイズを取得する。
         val maxWidth = LAppDelegate.getInstance().windowWidth
         val maxHeight = LAppDelegate.getInstance().windowHeight
-
-        // if (LAppDefine.DEBUG_LOG_ENABLE) {
-        //     android.util.Log.d("LAppView", "render: Window size: ${maxWidth}x${maxHeight}")
-        // }
 
         // 设置 OpenGL 状态
         GLES20.glEnable(GLES20.GL_BLEND)
@@ -221,27 +221,13 @@ class LAppView : AutoCloseable {
 
         // 首先渲染背景
         backSprite?.let { sprite ->
-            // if (LAppDefine.DEBUG_LOG_ENABLE) {
-            //     android.util.Log.d("LAppView", "render: Rendering background sprite")
-            // }
             sprite.setWindowSize(maxWidth, maxHeight)
             sprite.render()
-        } ?: run {
-            // if (LAppDefine.DEBUG_LOG_ENABLE) {
-            //     android.util.Log.w("LAppView", "render: backSprite is null!")
-            // }
         }
 
         // 然后渲染Live2D模型
-        // if (LAppDefine.DEBUG_LOG_ENABLE) {
-        //     android.util.Log.d("LAppView", "render: About to call live2dManager.onUpdate()")
-        // }
         val live2dManager = LAppLive2DManager.getInstance()
         live2dManager.onUpdate()
-        
-        // if (LAppDefine.DEBUG_LOG_ENABLE) {
-        //     android.util.Log.d("LAppView", "render: live2dManager.onUpdate() completed")
-        // }
 
         // 最后渲染UI元素，显示在最上层
         gearSprite?.let { sprite ->
@@ -252,10 +238,6 @@ class LAppView : AutoCloseable {
             sprite.setWindowSize(maxWidth, maxHeight)
             sprite.render()
         }
-        
-        // if (LAppDefine.DEBUG_LOG_ENABLE) {
-        //     android.util.Log.d("LAppView", "render: Render process completed")
-        // }
 
         if (isChangedModel) {
             isChangedModel = false
@@ -298,18 +280,12 @@ class LAppView : AutoCloseable {
         // 透過設定 - 模型使用预乘Alpha混合
         GLES20.glEnable(GLES20.GL_BLEND)
         GLES20.glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA)
-        
-        // if (LAppDefine.DEBUG_LOG_ENABLE) {
-        //     android.util.Log.d("LAppView", "preModelDraw: Blend function set to GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA")
-        // }
 
         // 別のレンダリングターゲットへ向けて描画する場合
         if (renderingTarget != RenderingTarget.NONE) {
 
-            // 使用するターゲット
-            useTarget = if (renderingTarget == RenderingTarget.VIEW_FRAME_BUFFER)
-                        refModel.getRenderingBuffer()
-                        else refModel.getRenderingBuffer()
+            // 使用するターゲット（現在の実装では常にモデルのレンダリングバッファを使用）
+            useTarget = refModel.getRenderingBuffer()
 
             // 描画ターゲット内部未作成の場合はここで作成
             if (!useTarget.isValid) {
@@ -335,10 +311,8 @@ class LAppView : AutoCloseable {
 
         // 別のレンダリングターゲットへ向けて描画する場合
         if (renderingTarget != RenderingTarget.NONE) {
-            // 使用するターゲット
-            useTarget = if (renderingTarget == RenderingTarget.VIEW_FRAME_BUFFER)
-                        refModel.getRenderingBuffer()
-                        else refModel.getRenderingBuffer()
+            // 使用するターゲット（現在の実装では常にモデルのレンダリングバッファを使用）
+            useTarget = refModel.getRenderingBuffer()
 
             // レンダリング終了
             useTarget.endDraw()
@@ -421,12 +395,12 @@ class LAppView : AutoCloseable {
         live2DManager.onTap(x, y)
 
         // 歯車ボタンにタップしたか
-        if (gearSprite!!.isHit(pointX, pointY)) {
+        if (gearSprite?.isHit(pointX, pointY) == true) {
             isChangedModel = true
         }
 
         // 電源ボタンにタップしたか
-        if (powerSprite!!.isHit(pointX, pointY)) {
+        if (powerSprite?.isHit(pointX, pointY) == true) {
             // アプリを終了する
             LAppDelegate.getInstance().deactivateApp()
         }
@@ -472,7 +446,7 @@ class LAppView : AutoCloseable {
      * @param deviceY デバイスY座標
      * @return ScreenY座標
      */
-    fun transformScreenY(deviceY: Float): Float = deviceToScreen.transformX(deviceY)
+    fun transformScreenY(deviceY: Float): Float = deviceToScreen.transformY(deviceY)
 
     /**
      * レンダリング先をデフォルト以外に切り替えた際の背景クリア色設定
@@ -520,7 +494,10 @@ class LAppView : AutoCloseable {
      * 建议在 GL 线程调用，调用后需要请求重绘。
      */
     fun setViewScale(scale: Float) {
-        if (scale <= 0.0f) {
+        if (scale <= 0.0f || scale.isNaN() || scale.isInfinite()) {
+            if (LAppDefine.DEBUG_LOG_ENABLE) {
+                android.util.Log.w("LAppView", "Invalid scale value: $scale")
+            }
             return
         }
         // 由 Manager 负责在投影矩阵中叠加缩放
@@ -531,6 +508,12 @@ class LAppView : AutoCloseable {
      * 设置视图位置偏移（逻辑坐标系，以屏幕中心为原点，向右为正X，向上为正Y）。
      */
     fun setViewPosition(x: Float, y: Float) {
+        if (x.isNaN() || x.isInfinite() || y.isNaN() || y.isInfinite()) {
+            if (LAppDefine.DEBUG_LOG_ENABLE) {
+                android.util.Log.w("LAppView", "Invalid position values: x=$x, y=$y")
+            }
+            return
+        }
         LAppLive2DManager.getInstance().setUserPosition(x, y)
     }
 
