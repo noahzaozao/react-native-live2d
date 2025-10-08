@@ -803,10 +803,28 @@ class ReactNativeLive2dView(context: Context, appContext: AppContext) :
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
 
-        Log.d(TAG, "onAttachedToWindow")
+        Log.d(TAG, "onAttachedToWindow: View attached to window")
 
-        // 通过 react native setIsPageFocused(false) 释放之后会重新通过 init 初始化
-        // 所以这里不需要做什么
+        // 恢复 GLSurfaceView 渲染
+        try {
+            if (::glSurfaceView.isInitialized) {
+                glSurfaceView.onResume()
+                Log.d(TAG, "onAttachedToWindow: GLSurfaceView resumed")
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "onAttachedToWindow: Failed to resume GLSurfaceView: ${e.message}")
+        }
+        
+        // 如果之前有加载的模型路径，尝试恢复模型
+        modelPath?.let { path ->
+            if (!isInitialized) {
+                Log.d(TAG, "onAttachedToWindow: Restoring model from path: $path")
+                // 延迟一帧，确保 GL 上下文已准备好
+                post {
+                    loadModel(path)
+                }
+            }
+        }
     }
 
     override fun onDetachedFromWindow() {

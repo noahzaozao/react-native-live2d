@@ -95,6 +95,12 @@ class LAppDelegate private constructor() {
      */
     @Volatile
     private var isShuttingDown: Boolean = false
+    
+    /**
+     * 标记 GL 上下文是否已经初始化
+     */
+    @Volatile
+    private var isGLContextInitialized: Boolean = false
 
     /**
      * モデルシーンインデックス
@@ -184,6 +190,9 @@ class LAppDelegate private constructor() {
         // 标记正在关闭，阻止新的操作
         markAsShuttingDown()
         
+        // 标记 GL 上下文将要失效（下次 onSurfaceCreated 时需要重新创建资源）
+        // 注意：不在这里重置，而是保留标志，让 onSurfaceCreated 检测到是恢复场景
+        
         try {
             // 1. 先释放 Live2D 管理器（会释放所有模型）
             LAppLive2DManager.releaseInstance()
@@ -243,6 +252,9 @@ class LAppDelegate private constructor() {
     fun onSurfaceCreated() {
         Log.d("LAppDelegate", "onSurfaceCreated: Starting OpenGL initialization")
         
+        val wasInitialized = isGLContextInitialized
+        
+        // 设置 OpenGL 状态
         GLES20.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
         GLES20.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
         GLES20.glEnable(GLES20.GL_BLEND)
@@ -253,9 +265,61 @@ class LAppDelegate private constructor() {
             Log.e("LAppDelegate", "OpenGL error in onSurfaceCreated: $error")
         }
 
+        // 初始化 Cubism Framework
         CubismFramework.initialize()
-
+        
+        if (wasInitialized) {
+            Log.w("LAppDelegate", "onSurfaceCreated: GL context was lost, recreating resources")
+            // GL 上下文丢失，需要重新创建资源
+            recreateGLResources()
+        } else {
+            Log.d("LAppDelegate", "onSurfaceCreated: First time initialization")
+        }
+        
+        isGLContextInitialized = true
         Log.d("LAppDelegate", "onSurfaceCreated: CubismFramework initialized")
+    }
+    
+    /**
+     * 重新创建 GL 资源（在 GL 上下文丢失后调用）
+     * 注意：必须在 GL 线程调用
+     */
+    private fun recreateGLResources() {
+        if (LAppDefine.DEBUG_LOG_ENABLE) {
+            LAppPal.printLog("LAppDelegate: Recreating GL resources after context loss")
+        }
+        
+        try {
+            // 1. 重新创建纹理管理器（旧的纹理 ID 已失效）
+            textureManager = LAppTextureManager()
+            if (LAppDefine.DEBUG_LOG_ENABLE) {
+                LAppPal.printLog("LAppDelegate: TextureManager recreated")
+            }
+            
+            // 2. 重新创建视图（包括着色器）
+            view?.let { oldView ->
+                try {
+                    oldView.close()
+                } catch (e: Exception) {
+                    LAppPal.printLog("LAppDelegate: Error closing old view: ${e.message}")
+                }
+            }
+            view = LAppView()
+            if (LAppDefine.DEBUG_LOG_ENABLE) {
+                LAppPal.printLog("LAppDelegate: LAppView recreated")
+            }
+            
+            // 3. 通知 Live2D 管理器重新绑定所有模型的纹理
+            val manager = LAppLive2DManager.getInstance()
+            manager.notifyGLContextRecreated()
+            if (LAppDefine.DEBUG_LOG_ENABLE) {
+                LAppPal.printLog("LAppDelegate: Models notified of GL context recreation")
+            }
+            
+        } catch (e: Exception) {
+            LAppPal.printLog("LAppDelegate: Error recreating GL resources: ${e.message}")
+            e.printStackTrace()
+        }
     }
 
     fun onSurfaceChanged(width: Int, height: Int) {

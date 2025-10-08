@@ -50,6 +50,30 @@ class LAppLive2DManager private constructor() {
         }
         models.clear()
     }
+    
+    /**
+     * 通知所有模型 GL 上下文已重新创建
+     * 在 GL 上下文丢失后调用，用于重新加载纹理和渲染器
+     */
+    fun notifyGLContextRecreated() {
+        if (LAppDefine.DEBUG_LOG_ENABLE) {
+            LAppPal.printLog("LAppLive2DManager: Notifying ${models.size} models of GL context recreation")
+        }
+        
+        synchronized(models) {
+            for (model in models) {
+                try {
+                    model.recreateGLResources()
+                    if (LAppDefine.DEBUG_LOG_ENABLE) {
+                        LAppPal.printLog("LAppLive2DManager: Model GL resources recreated")
+                    }
+                } catch (e: Exception) {
+                    LAppPal.printLog("LAppLive2DManager: Error recreating model GL resources: ${e.message}")
+                    e.printStackTrace()
+                }
+            }
+        }
+    }
 
     /**
      * 初始化模型管理器（移除assets扫描逻辑，统一使用文件系统路径）

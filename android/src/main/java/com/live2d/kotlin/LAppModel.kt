@@ -289,6 +289,57 @@ class LAppModel : CubismUserModel() {
     }
     
     /**
+     * 重新创建 GL 资源（在 GL 上下文丢失后调用）
+     * 必须在 GL 线程调用
+     */
+    fun recreateGLResources() {
+        LAppPal.printLogLazy { "recreateGLResources: Starting GL resource recreation for model" }
+        
+        try {
+            // 1. 清空待绑定纹理队列（旧的纹理 ID 已失效）
+            pendingTextures.clear()
+            
+            // 2. 重新创建渲染器
+            try {
+                val renderer = CubismRendererAndroid.create()
+                setupRenderer(renderer)
+                LAppPal.printLogLazy { "recreateGLResources: Renderer recreated" }
+            } catch (e: Exception) {
+                LAppPal.printLog("recreateGLResources: Failed to recreate renderer: ${e.message}")
+                e.printStackTrace()
+            }
+            
+            // 3. 重新加载纹理（从文件系统）
+            if (modelHomeDirectory.isNotEmpty()) {
+                setupTexturesFromFileSystem()
+                LAppPal.printLogLazy { "recreateGLResources: Textures reloaded from filesystem" }
+            } else {
+                LAppPal.printLog("recreateGLResources: No model directory, skipping texture reload")
+            }
+            
+            // 4. 重新创建离屏渲染缓冲
+            try {
+                if (renderingBuffer.isValid) {
+                    renderingBuffer.destroyOffscreenSurface()
+                }
+                val width = LAppDelegate.getInstance().windowWidth
+                val height = LAppDelegate.getInstance().windowHeight
+                if (width > 0 && height > 0) {
+                    renderingBuffer.createOffscreenSurface(width, height, null)
+                    LAppPal.printLogLazy { "recreateGLResources: Offscreen buffer recreated" }
+                }
+            } catch (e: Exception) {
+                LAppPal.printLog("recreateGLResources: Failed to recreate offscreen buffer: ${e.message}")
+            }
+            
+            LAppPal.printLogLazy { "recreateGLResources: GL resource recreation completed" }
+        } catch (e: Exception) {
+            LAppPal.printLog("recreateGLResources: Unexpected error: ${e.message}")
+            e.printStackTrace()
+        }
+    }
+    
+    /**
      * 绑定延迟的纹理（线程安全）
      */
     fun bindPendingTextures() {
