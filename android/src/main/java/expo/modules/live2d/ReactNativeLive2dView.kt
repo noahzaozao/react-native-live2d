@@ -29,6 +29,15 @@ class ReactNativeLive2dView(context: Context, appContext: AppContext) :
     private val expressionQueue: ArrayDeque<String> = ArrayDeque()
     private var isMotionPlaying: Boolean = false
     private val motionHandler = android.os.Handler(context.mainLooper)
+    
+    companion object {
+        private const val TAG = "ReactNativeLive2dView"
+        
+        // 队列管理常量
+        private const val MAX_MOTION_QUEUE_SIZE = 3  // 最大动作队列长度
+        private const val MAX_EXPRESSION_QUEUE_SIZE = 2  // 最大表情队列长度
+        private const val TEXTURE_BIND_RETRY_DELAY_MS = 50L  // 纹理绑定重试延迟
+    }
 
     // Event dispatchers for each event type
     private val onModelLoaded by EventDispatcher()
@@ -54,10 +63,6 @@ class ReactNativeLive2dView(context: Context, appContext: AppContext) :
     var currentAutoBreath: Boolean? = null
         private set
 
-    companion object {
-        private const val TAG = "ReactNativeLive2dView"
-    }
-
     private val delegate: LAppDelegate by lazy { LAppDelegate.getInstance() }
 
     private fun getActivity(): android.app.Activity? {
@@ -72,7 +77,9 @@ class ReactNativeLive2dView(context: Context, appContext: AppContext) :
     }
 
     init {
-        Log.d(TAG, "init")
+        if (LAppDefine.DEBUG_LOG_ENABLE) {
+            Log.d(TAG, "init")
+        }
 
         initializeComponents()
 
@@ -82,7 +89,9 @@ class ReactNativeLive2dView(context: Context, appContext: AppContext) :
 
     private fun initializeComponents() {
         try {
-            Log.d(TAG, "initializeComponents")
+            if (LAppDefine.DEBUG_LOG_ENABLE) {
+                Log.d(TAG, "initializeComponents")
+            }
 
             live2dManager = LAppLive2DManager.getInstance()
 
@@ -100,18 +109,24 @@ class ReactNativeLive2dView(context: Context, appContext: AppContext) :
 
             // 基本的 OpenGL ES 2.0 设置
             glSurfaceView.setEGLContextClientVersion(2)
-            Log.d(TAG, "setupGLSurfaceView setEGLContextClientVersion 2")
+            if (LAppDefine.DEBUG_LOG_ENABLE) {
+                Log.d(TAG, "setupGLSurfaceView setEGLContextClientVersion 2")
+            }
 
             // 设置渲染器
             glSurfaceView.setRenderer(renderer)
-            Log.d(TAG, "setupGLSurfaceView glSurfaceView.setRenderer")
+            if (LAppDefine.DEBUG_LOG_ENABLE) {
+                Log.d(TAG, "setupGLSurfaceView glSurfaceView.setRenderer")
+            }
 
             // 设置渲染模式为连续渲染
             glSurfaceView.renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
 
             isGLSetupComplete = true
 
-            Log.d(TAG, "initializeComponents successfully")
+            if (LAppDefine.DEBUG_LOG_ENABLE) {
+                Log.d(TAG, "initializeComponents successfully")
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to initialize GL components: ${e.message}", e)
             dispatchEvent(
@@ -506,39 +521,71 @@ class ReactNativeLive2dView(context: Context, appContext: AppContext) :
      * @param motionIndex Motion index within the group (0-based)
      * 
      * Note: Motions are queued and played sequentially to prevent conflicts
-     * Duplicate requests are automatically filtered
+     * Smart queue management: If queue is full, removes oldest non-playing motion
      */
     fun startMotion(motionGroup: String, motionIndex: Int) {
-        Log.d(TAG, "startMotion $motionGroup[$motionIndex]")
+        if (LAppDefine.DEBUG_LOG_ENABLE) {
+            Log.d(TAG, "startMotion $motionGroup[$motionIndex]")
+        }
 
         // 使用去重键避免快速重复触发
         val opKey = "motion:${motionGroup}#${motionIndex}"
         if (!pendingOperations.add(opKey)) {
-            Log.d(TAG, "startMotion de-duplicated: $opKey")
+            if (LAppDefine.DEBUG_LOG_ENABLE) {
+                Log.d(TAG, "startMotion de-duplicated: $opKey")
+            }
             return
         }
 
         currentMotionGroup = motionGroup
         currentMotionIndex = motionIndex
 
+        // 智能队列管理：如果队列已满，移除最旧的项（保留最新的用户意图）
+        if (motionQueue.size >= MAX_MOTION_QUEUE_SIZE) {
+            val removed = motionQueue.removeFirstOrNull()
+            if (LAppDefine.DEBUG_LOG_ENABLE) {
+                Log.d(TAG, "startMotion: Queue full, removed oldest motion: $removed")
+            }
+        }
+
         // 入队，统一串行播放
         motionQueue.addLast(Pair(motionGroup, motionIndex))
+        if (LAppDefine.DEBUG_LOG_ENABLE) {
+            Log.d(TAG, "startMotion: Queue size: ${motionQueue.size}")
+        }
         processNextMotionIfIdle()
         pendingOperations.remove(opKey)
     }
 
     fun setExpression(expressionId: String) {
-        Log.d(TAG, "setExpression $expressionId")
+        if (LAppDefine.DEBUG_LOG_ENABLE) {
+            Log.d(TAG, "setExpression $expressionId")
+        }
 
         // 使用去重键避免快速重复触发
         val opKey = "expression:${expressionId}"
         if (!pendingOperations.add(opKey)) {
-            Log.d(TAG, "setExpression de-duplicated: $opKey")
+            if (LAppDefine.DEBUG_LOG_ENABLE) {
+                Log.d(TAG, "setExpression de-duplicated: $opKey")
+            }
             return
         }
 
         currentExpressionId = expressionId
+        
+        // 智能队列管理：表情切换更倾向于立即响应，保留最新的几个请求即可
+        if (expressionQueue.size >= MAX_EXPRESSION_QUEUE_SIZE) {
+            // 清空旧队列，只保留最新的表情意图
+            expressionQueue.clear()
+            if (LAppDefine.DEBUG_LOG_ENABLE) {
+                Log.d(TAG, "setExpression: Queue full, cleared old expressions")
+            }
+        }
+        
         expressionQueue.addLast(expressionId)
+        if (LAppDefine.DEBUG_LOG_ENABLE) {
+            Log.d(TAG, "setExpression: Queue size: ${expressionQueue.size}")
+        }
         processExpressionQueue()
         pendingOperations.remove(opKey)
     }
