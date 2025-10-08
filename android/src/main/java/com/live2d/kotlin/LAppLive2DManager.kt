@@ -71,16 +71,8 @@ class LAppLive2DManager private constructor() {
         val width = LAppDelegate.getInstance().windowWidth
         val height = LAppDelegate.getInstance().windowHeight
 
-        // 减少调试日志
-        // if (LAppDefine.DEBUG_LOG_ENABLE) {
-        //     LAppPal.printLog("onUpdate: Total models: ${models.size}, Window size: ${width}x${height}")
-        // }
-
         for (i in models.indices) {
             val model = models[i]
-            // if (LAppDefine.DEBUG_LOG_ENABLE) {
-            //     LAppPal.printLog("onUpdate: Processing model $i, getModel() result: ${if (model.model != null) "not null" else "null"}")
-            // }
 
             if (model.model == null) {
                 LAppPal.printLog("Failed to model.getModel() for model $i - skipping render")
@@ -90,33 +82,13 @@ class LAppLive2DManager private constructor() {
             // 投影矩阵を初期化
             projection.loadIdentity()
 
-            // 使用官方示例的投影矩阵设置逻辑
-            // 减少调试日志
-            // if (LAppDefine.DEBUG_LOG_ENABLE) {
-            //     LAppPal.printLog("onUpdate: Model canvas size - Width: ${model.model!!.canvasWidth}, Height: ${model.model!!.canvasHeight}")
-            //     LAppPal.printLog("onUpdate: Window size - Width: $width, Height: $height")
-            //     LAppPal.printLog("onUpdate: Canvas width > 1.0f: ${model.model!!.canvasWidth > 1.0f}, width < height: ${width < height}")
-            // }
-            
             if (model.model!!.canvasWidth > 1.0f && width < height) {
-                // 横に長いモデルを縦長ウィンドウに表示する際モデルの横サイズでscaleを算出する
-                // if (LAppDefine.DEBUG_LOG_ENABLE) {
-                //     LAppPal.printLog("onUpdate: Using horizontal scaling logic")
-                //     LAppPal.printLog("onUpdate: modelMatrix is null: ${model.modelMatrix == null}")
-                // }
                 if (model.modelMatrix != null) {
                     model.modelMatrix!!.setWidth(2.0f)
                 } else {
-                    // if (LAppDefine.DEBUG_LOG_ENABLE) {
-                    //     LAppPal.printLog("onUpdate: modelMatrix is null, cannot set width")
-                    // }
                 }
                 projection.scale(1.0f, width.toFloat() / height.toFloat())
             } else {
-                // if (LAppDefine.DEBUG_LOG_ENABLE) {
-                //     LAppPal.printLog("onUpdate: Using vertical scaling logic")
-                //     LAppPal.printLog("onUpdate: modelMatrix is null: ${model.modelMatrix == null}")
-                // }
                 projection.scale(height.toFloat() / width.toFloat(), 1.0f)
             }
 
@@ -125,40 +97,15 @@ class LAppLive2DManager private constructor() {
                 viewMatrix.multiplyByMatrix(projection)
             }
 
-            // 叠加用户位移和缩放
-            // 减少调试日志，只保留关键信息
-            // if (LAppDefine.DEBUG_LOG_ENABLE) {
-            //     LAppPal.printLog("onUpdate: Before user transform - userScale: $userScale, userOffsetX: $userOffsetX, userOffsetY: $userOffsetY")
-            //     LAppPal.printLog("onUpdate: Projection matrix before user transform: ${projection.getArray().contentToString()}")
-            // }
-            
             projection.translateRelative(userOffsetX, userOffsetY)
             projection.scaleRelative(userScale, userScale)
             
-            // if (LAppDefine.DEBUG_LOG_ENABLE) {
-            //     LAppPal.printLog("onUpdate: Projection matrix after user transform: ${projection.getArray().contentToString()}")
-            // }
-
-            // if (DEBUG_LOG_ENABLE) {
-            //     LAppPal.printLog("onUpdate: Projection matrix configured for model " + i);
-            // }
-
             // モデル1体描画前コール
             LAppDelegate.getInstance().view?.preModelDraw(model)
 
-            // if (LAppDefine.DEBUG_LOG_ENABLE) {
-            //     LAppPal.printLog("onUpdate: About to call model.update() for model $i")
-            // }
             model.update()
 
-            // if (LAppDefine.DEBUG_LOG_ENABLE) {
-            //     LAppPal.printLog("onUpdate: About to call model.draw() for model $i")
-            // }
             model.draw(projection)     // 参照渡しなのでprojectionは変質する
-
-            // if (LAppDefine.DEBUG_LOG_ENABLE) {
-            //     LAppPal.printLog("onUpdate: model.draw() completed for model $i")
-            // }
 
             // モデル1体描画後コール
             LAppDelegate.getInstance().view?.postModelDraw(model)

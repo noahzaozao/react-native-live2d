@@ -73,15 +73,6 @@ class ReactNativeLive2dView(context: Context, appContext: AppContext) :
     init {
         Log.d(TAG, "init")
 
-        // 在初始化前先清理可能存在的旧状态，避免Expo Refresh后的状态不一致
-        // try {
-        //   val manager = LAppLive2DManager.getInstance()
-        //   manager.releaseAllModel()
-        //   Log.d(TAG, "init: cleared existing models during initialization")
-        // } catch (e: Exception) {
-        //   Log.w(TAG, "init: failed to clear existing models: ${e.message}")
-        // }
-
         initializeComponents()
 
         val activity = getActivity()
@@ -208,63 +199,10 @@ class ReactNativeLive2dView(context: Context, appContext: AppContext) :
             return
         }
 
-        // 在加载新模型前，先重置视图状态（除非是第一次加载）
-        // if (isInitialized) {
-        //     Log.d(TAG, "loadModel: resetting view state before loading new model")
-        //     resetViewState()
-        // }
-
         this.modelPath = modelPath
-
-        // 若 GL 尚未完成初始化，则延迟到 GL 准备就绪后再执行
-        // if (!isGLSetupComplete) {
-        //     Log.d(TAG, "loadModel: GL not ready, deferring model load")
-        //     runAfterGLReady("loadModel:$modelPath") {
-        //         try {
-        //             val manager = LAppLive2DManager.getInstance()
-        //             loadModelFromFileSystem(modelPath, manager)
-        //             glSurfaceView.requestRender()
-        //             isInitialized = true
-        //             dispatchEvent("onModelLoaded", mapOf("modelPath" to modelPath))
-        //         } catch (e: Exception) {
-        //             Log.e(TAG, "deferred loadModel onError: ${e.message}", e)
-        //             dispatchEvent(
-        //                     "onError",
-        //                     mapOf(
-        //                             "error" to "MODEL_LOAD_ERROR",
-        //                             "message" to "deferred loadModel onError: ${e.message}"
-        //                     )
-        //             )
-        //         }
-        //     }
-        //     return
-        // }
 
         try {
             Log.d(TAG, "loadModel: starting model loading process")
-
-            // 清理后可能移除了 renderer，这里需要确保 GL 渲染器与 Delegate 已就绪
-            // if (!isGLSetupComplete || !::renderer.isInitialized) {
-            //     Log.d(TAG, "loadModel: GL not ready, reinitializing renderer and delegate")
-            //     try {
-            //         glSurfaceView.setEGLContextClientVersion(2)
-            //         if (!::renderer.isInitialized) {
-            //             renderer = GLRenderer()
-            //         }
-            //         glSurfaceView.setRenderer(renderer)
-            //         glSurfaceView.renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
-            //         glSurfaceView.onResume()
-            //     } catch (e: Exception) {
-            //         Log.w(TAG, "loadModel: failed to re-setup GL surface: ${e.message}")
-            //     }
-            //     // 确保 LAppDelegate 处于启动状态
-            //     try {
-            //         getActivity()?.let { delegate.onStart(it) }
-            //     } catch (e: Exception) {
-            //         Log.w(TAG, "loadModel: failed to re-start delegate: ${e.message}")
-            //     }
-            //     isGLSetupComplete = true
-            // }
 
             // 确保在 GL 线程加载模型与创建纹理
             Log.d(TAG, "loadModel before queueEvent")
@@ -769,49 +707,6 @@ class ReactNativeLive2dView(context: Context, appContext: AppContext) :
 
         // 通过 react native setIsPageFocused(false) 释放之后会重新通过 init 初始化
         // 所以这里不需要做什么
-
-        // RN 页面切换回来时，视图会 re-attach，但不会调用构造/ init。
-        // 如果之前在 onDetachedFromWindow 中做了清理，这里需要恢复 GL 与 delegate 状态。
-        // try {
-        //     if (live2dManager == null) {
-        //         Log.d(TAG, "onAttachedToWindow: live2dManager is null, initializing")
-        //         live2dManager = LAppLive2DManager.getInstance()
-        //     }
-            
-        //     if (!isGLSetupComplete) {
-        //         Log.d(TAG, "onAttachedToWindow: reinitializing GL context and delegate")
-                
-        //         // 如果 GLSurfaceView 已存在但渲染器未初始化，只重新设置渲染器
-        //         if (::glSurfaceView.isInitialized) {
-        //             try {
-        //                 renderer = if (::renderer.isInitialized) renderer else GLRenderer()
-        //                 // glSurfaceView.setEGLContextClientVersion(2)
-        //                 // glSurfaceView.setRenderer(renderer)
-        //                 // glSurfaceView.renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
-        //                 glSurfaceView.onResume()
-        //                 isGLSetupComplete = true
-        //                 Log.d(TAG, "onAttachedToWindow: GL context restored")
-        //             } catch (e: Exception) {
-        //                 Log.w(TAG, "onAttachedToWindow: failed to restore GL context: ${e.message}")
-        //             }
-        //         } else {
-        //             // 如果 GLSurfaceView 不存在，完整初始化
-        //             try {
-        //                 initializeComponents()
-        //             } catch (e: Exception) {
-        //                 Log.w(TAG, "onAttachedToWindow: failed to setup GL surface: ${e.message}")
-        //             }
-        //         }
-
-        //         try {
-        //             getActivity()?.let { delegate.onStart(it) }
-        //         } catch (e: Exception) {
-        //             Log.w(TAG, "onAttachedToWindow: failed to start delegate: ${e.message}")
-        //         }
-        //     }
-        // } catch (e: Exception) {
-        //     Log.w(TAG, "onAttachedToWindow: reinit guard error: ${e.message}")
-        // }
     }
 
     override fun onDetachedFromWindow() {

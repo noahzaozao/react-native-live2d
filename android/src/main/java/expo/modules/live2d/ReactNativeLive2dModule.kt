@@ -45,8 +45,6 @@ class ReactNativeLive2dModule : Module() {
 
                     if (view.modelPath != null) {
                         view.clearModel()
-                        // val manager = LAppLive2DManager.getInstance()
-                        // manager.releaseAllModel()
                         Log.d(TAG, "modelPath cleared")
                     } else {
                         Log.d(TAG, "modelPath is null or empty, skipping model loading")
