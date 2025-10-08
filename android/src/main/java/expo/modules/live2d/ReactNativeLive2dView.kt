@@ -420,16 +420,17 @@ class ReactNativeLive2dView(context: Context, appContext: AppContext) :
     }
 
     fun clearAll() {
-        Log.d(TAG, "clearAll")
+        Log.d(TAG, "clearAll: Starting full cleanup")
 
+        // 1. 清理模型资源
         clearModel()
 
         // 2. 清理LAppView资源（包括sprite shader等）
         try {
             delegate.view?.close()
-            Log.d(TAG, "onDetachedFromWindow: closed LAppView")
+            Log.d(TAG, "clearAll: closed LAppView")
         } catch (e: Exception) {
-            Log.w(TAG, "onDetachedFromWindow: failed to close LAppView: ${e.message}")
+            Log.w(TAG, "clearAll: failed to close LAppView: ${e.message}")
         }
 
         // 3. 清理纹理管理器（通过LAppDelegate的onStop方法）
@@ -441,48 +442,61 @@ class ReactNativeLive2dView(context: Context, appContext: AppContext) :
                     glSurfaceView.queueEvent {
                         try {
                             tm.dispose()
+                            Log.d(TAG, "clearAll: textures disposed on GL thread")
                         } catch (e: Exception) {
-                            Log.w(TAG, "Failed to dispose textures: ${e.message}")
+                            Log.w(TAG, "clearAll: failed to dispose textures: ${e.message}")
                         }
                     }
                 }
             } catch (e: Exception) {
-                Log.w(TAG, "Failed to access texture manager: ${e.message}")
+                Log.w(TAG, "clearAll: failed to access texture manager: ${e.message}")
             }
-            // 然后再调用 onStop 做框架级清理
+            
+            // 调用 onStop 做框架级清理
             delegate.onStop()
-            Log.d(TAG, "onDetachedFromWindow: called delegate.onStop()")
+            Log.d(TAG, "clearAll: delegate.onStop() completed")
         } catch (e: Exception) {
-            Log.w(TAG, "onDetachedFromWindow: failed to call delegate.onStop(): ${e.message}")
+            Log.w(TAG, "clearAll: failed to call delegate.onStop(): ${e.message}")
         }
 
         // 4. 暂停GLSurfaceView渲染
         try {
             glSurfaceView.onPause()
-            Log.d(TAG, "onDetachedFromWindow: paused GLSurfaceView")
+            Log.d(TAG, "clearAll: GLSurfaceView paused")
         } catch (e: Exception) {
-            Log.w(TAG, "onDetachedFromWindow: failed to pause GLSurfaceView: ${e.message}")
+            Log.w(TAG, "clearAll: failed to pause GLSurfaceView: ${e.message}")
         }
 
         // 5. 断开渲染器引用，帮助 GC
         try {
             // 在 GL 线程上清空 renderer 相关引用（若有内部状态）
             try {
-                glSurfaceView.queueEvent { /* no-op hook to ensure prior GL tasks flushed */}
+                glSurfaceView.queueEvent { 
+                    Log.d(TAG, "clearAll: GL tasks flushed")
+                }
             } catch (e: Exception) {
-                Log.w(TAG, "Failed to queue GL flush event: ${e.message}")
+                Log.w(TAG, "clearAll: failed to queue GL flush event: ${e.message}")
             }
             // 注意：GLSurfaceView 一旦设置过渲染器就不能再设置为 null，只能暂停
             // 这里我们只暂停渲染，不尝试 unset renderer
-            Log.d(TAG, "onDetachedFromWindow: GLSurfaceView renderer kept (cannot unset)")
+            Log.d(TAG, "clearAll: GLSurfaceView renderer kept (cannot unset)")
         } catch (e: Exception) {
-            Log.w(TAG, "onDetachedFromWindow: failed to flush GL tasks: ${e.message}")
+            Log.w(TAG, "clearAll: failed to flush GL tasks: ${e.message}")
         }
 
-        // 6. 重置组件状态
-        // resetViewState()
+        // 6. 释放 LAppDelegate 单例（允许垃圾回收）
+        try {
+            LAppDelegate.releaseInstance()
+            Log.d(TAG, "clearAll: LAppDelegate singleton released")
+        } catch (e: Exception) {
+            Log.w(TAG, "clearAll: failed to release LAppDelegate: ${e.message}")
+        }
+
+        // 7. 重置组件状态
         isGLSetupComplete = false
         live2dManager = null
+        
+        Log.d(TAG, "clearAll: Full cleanup completed")
     }
 
     /**

@@ -242,20 +242,67 @@ class LAppLive2DManager private constructor() {
         private val finishedMotion = FinishedMotion()
 
         /**
-         * シングルトンインスタンス - 使用 lazy 委托确保线程安全
+         * 单例实例，使用 Double-Checked Locking 模式确保线程安全
+         * 使用 @Volatile 确保多线程可见性
          */
-        private val _instance: LAppLive2DManager by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
-            LAppLive2DManager()
-        }
-
-        fun getInstance(): LAppLive2DManager = _instance
+        @Volatile
+        private var INSTANCE: LAppLive2DManager? = null
 
         /**
-         * 释放所有模型（清理模型列表）
-         * 注意：由于使用 lazy 委托，单例实例本身不能被释放
+         * 获取单例实例
+         * 使用 Double-Checked Locking 减少同步开销
+         */
+        fun getInstance(): LAppLive2DManager {
+            // 第一次检查，避免不必要的同步
+            val instance = INSTANCE
+            if (instance != null) {
+                return instance
+            }
+            
+            // 同步块内创建实例
+            return synchronized(this) {
+                // 第二次检查，防止多线程同时创建
+                val newInstance = INSTANCE
+                if (newInstance != null) {
+                    newInstance
+                } else {
+                    LAppLive2DManager().also { 
+                        INSTANCE = it
+                        if (LAppDefine.DEBUG_LOG_ENABLE) {
+                            LAppPal.printLog("LAppLive2DManager: New instance created")
+                        }
+                    }
+                }
+            }
+        }
+
+        /**
+         * 释放单例实例和所有模型资源
+         * 此方法会真正释放实例，允许垃圾回收
          */
         fun releaseInstance() {
-            _instance.releaseAllModel()
+            synchronized(this) {
+                val instance = INSTANCE
+                if (instance != null) {
+                    if (LAppDefine.DEBUG_LOG_ENABLE) {
+                        LAppPal.printLog("LAppLive2DManager: Releasing singleton instance and all models")
+                    }
+                    
+                    // 先释放所有模型
+                    instance.releaseAllModel()
+                    
+                    // 清空引用，允许垃圾回收
+                    INSTANCE = null
+                    
+                    if (LAppDefine.DEBUG_LOG_ENABLE) {
+                        LAppPal.printLog("LAppLive2DManager: Instance released successfully")
+                    }
+                } else {
+                    if (LAppDefine.DEBUG_LOG_ENABLE) {
+                        LAppPal.printLog("LAppLive2DManager: No instance to release")
+                    }
+                }
+            }
         }
     }
 }

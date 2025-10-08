@@ -16,27 +16,68 @@ import com.live2d.sdk.cubism.framework.CubismFramework
 class LAppDelegate private constructor() {
     
     companion object {
-        // 使用 lazy 委托确保线程安全的单例初始化
-        // 注意：属性名使用下划线前缀避免与 getInstance() 方法的 JVM 签名冲突
-        private val _instance: LAppDelegate by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
-            LAppDelegate()
-        }
+        /**
+         * 单例实例，使用 Double-Checked Locking 模式确保线程安全
+         * 使用 @Volatile 确保多线程可见性
+         */
+        @Volatile
+        private var INSTANCE: LAppDelegate? = null
         
-        fun getInstance(): LAppDelegate = _instance
+        /**
+         * 获取单例实例
+         * 使用 Double-Checked Locking 减少同步开销
+         */
+        fun getInstance(): LAppDelegate {
+            // 第一次检查，避免不必要的同步
+            val instance = INSTANCE
+            if (instance != null) {
+                return instance
+            }
+            
+            // 同步块内创建实例
+            return synchronized(this) {
+                // 第二次检查，防止多线程同时创建
+                val newInstance = INSTANCE
+                if (newInstance != null) {
+                    newInstance
+                } else {
+                    LAppDelegate().also { 
+                        INSTANCE = it
+                        if (LAppDefine.DEBUG_LOG_ENABLE) {
+                            LAppPal.printLog("LAppDelegate: New instance created")
+                        }
+                    }
+                }
+            }
+        }
 
         /**
-         * クラスのインスタンス（シングルトン）を解放する。
-         * 注意：调用此方法前必须确保所有 GL 回调已停止
-         * 警告：由于使用了 lazy 委托，实例在 JVM 生命周期内会持续存在
-         * 这个方法主要用于标记关闭状态，而非真正释放实例
+         * 释放单例实例
+         * 注意：调用此方法前必须确保所有 GL 回调已停止，且在主线程或 GL 线程外调用
+         * 此方法会真正释放实例，允许垃圾回收
          */
-        @Deprecated(
-            message = "Singleton instance cannot be truly released due to lazy initialization",
-            replaceWith = ReplaceWith("getInstance().markAsShuttingDown()")
-        )
         fun releaseInstance() {
             synchronized(this) {
-                _instance.isShuttingDown = true
+                val instance = INSTANCE
+                if (instance != null) {
+                    if (LAppDefine.DEBUG_LOG_ENABLE) {
+                        LAppPal.printLog("LAppDelegate: Releasing singleton instance")
+                    }
+                    
+                    // 标记为关闭状态
+                    instance.isShuttingDown = true
+                    
+                    // 清空引用，允许垃圾回收
+                    INSTANCE = null
+                    
+                    if (LAppDefine.DEBUG_LOG_ENABLE) {
+                        LAppPal.printLog("LAppDelegate: Instance released successfully")
+                    }
+                } else {
+                    if (LAppDefine.DEBUG_LOG_ENABLE) {
+                        LAppPal.printLog("LAppDelegate: No instance to release")
+                    }
+                }
             }
         }
     }
@@ -143,17 +184,40 @@ class LAppDelegate private constructor() {
         // 标记正在关闭，阻止新的操作
         markAsShuttingDown()
         
-        view?.let {
-            it.close()
-            view = null  // 显式设置为null，避免状态不一致
+        try {
+            // 1. 先释放 Live2D 管理器（会释放所有模型）
+            LAppLive2DManager.releaseInstance()
+            if (LAppDefine.DEBUG_LOG_ENABLE) {
+                LAppPal.printLog("LAppDelegate.onStop: LAppLive2DManager released")
+            }
+            
+            // 2. 关闭视图（会释放着色器等）
+            view?.let {
+                it.close()
+                view = null
+            }
+            if (LAppDefine.DEBUG_LOG_ENABLE) {
+                LAppPal.printLog("LAppDelegate.onStop: View closed")
+            }
+            
+            // 3. 清空纹理管理器引用
+            textureManager = null
+            if (LAppDefine.DEBUG_LOG_ENABLE) {
+                LAppPal.printLog("LAppDelegate.onStop: TextureManager cleared")
+            }
+            
+            // 4. 清空 Activity 引用
+            activity = null
+            
+            // 5. 最后清理 Cubism Framework
+            CubismFramework.dispose()
+            if (LAppDefine.DEBUG_LOG_ENABLE) {
+                LAppPal.printLog("LAppDelegate.onStop: CubismFramework disposed")
+            }
+        } catch (e: Exception) {
+            LAppPal.printLog("LAppDelegate.onStop: Error during cleanup: ${e.message}")
+            e.printStackTrace()
         }
-        if (LAppDefine.DEBUG_LOG_ENABLE) {
-            LAppPal.printLog("LAppDelegate.onStop: Setting textureManager to null")
-        }
-        textureManager = null
-
-        LAppLive2DManager.releaseInstance()
-        CubismFramework.dispose()
         
         if (LAppDefine.DEBUG_LOG_ENABLE) {
             LAppPal.printLog("LAppDelegate.onStop: Cleanup completed")
@@ -162,9 +226,18 @@ class LAppDelegate private constructor() {
 
     fun onDestroy() {
         if (LAppDefine.DEBUG_LOG_ENABLE) {
-            LAppPal.printLog("LAppDelegate.onDestroy: Releasing singleton instance")
+            LAppPal.printLog("LAppDelegate.onDestroy: Starting destruction")
         }
+        
+        // 先执行 onStop 确保资源已清理
+        onStop()
+        
+        // 然后释放单例实例
         releaseInstance()
+        
+        if (LAppDefine.DEBUG_LOG_ENABLE) {
+            LAppPal.printLog("LAppDelegate.onDestroy: Destruction completed")
+        }
     }
 
     fun onSurfaceCreated() {
