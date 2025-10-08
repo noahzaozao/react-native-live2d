@@ -126,15 +126,14 @@ class LAppModel : CubismUserModel() {
         initializeParameterIds()
     }
 
+    /**
+     * 初始化参数ID，确保CubismFramework已就绪
+     * @throws IllegalStateException 如果CubismFramework未初始化
+     */
     private fun initializeParameterIds() {
         try {
             val idManager = CubismFramework.getIdManager()
-            if (idManager == null) {
-                if (LAppDefine.DEBUG_LOG_ENABLE) {
-                    LAppPal.printLog("CubismFramework.getIdManager() returned null, deferring parameter ID initialization")
-                }
-                return
-            }
+                ?: throw IllegalStateException("CubismFramework.getIdManager() returned null - Framework not initialized")
 
             idParamAngleX = idManager.getId(ParameterId.ANGLE_X.id)
             idParamAngleY = idManager.getId(ParameterId.ANGLE_Y.id)
@@ -147,10 +146,17 @@ class LAppModel : CubismUserModel() {
                 LAppPal.printLog("Parameter IDs initialized successfully")
             }
         } catch (e: Exception) {
-            if (LAppDefine.DEBUG_LOG_ENABLE) {
-                LAppPal.printLog("Failed to initialize parameter IDs: ${e.message}")
-            }
+            LAppPal.printLog("CRITICAL: Failed to initialize parameter IDs: ${e.message}")
             throw e
+        }
+    }
+    
+    /**
+     * 确保参数ID已初始化，在使用前调用
+     */
+    private fun ensureParameterIdsInitialized() {
+        if (!::idParamAngleX.isInitialized) {
+            initializeParameterIds()
         }
     }
 
@@ -421,6 +427,9 @@ class LAppModel : CubismUserModel() {
      * モデルの更新処理。モデルのパラメーターから描画状態を決定する。
      */
     fun update() {
+        // 确保参数ID已初始化
+        ensureParameterIdsInitialized()
+        
         val deltaTimeSeconds = LAppPal.getDeltaTime()
         userTimeSeconds += deltaTimeSeconds
 
@@ -456,16 +465,16 @@ class LAppModel : CubismUserModel() {
 
         // ドラッグによる変化
         // ドラッグによる顔の向きの調整
-        model?.addParameterValue(idParamAngleX, dragX * 30) // -30から30の値を加える
-        model?.addParameterValue(idParamAngleY, dragY * 30)
-        model?.addParameterValue(idParamAngleZ, dragX * dragY * -30)
+        model?.addParameterValue(idParamAngleX, dragX * DRAG_ANGLE_MULTIPLIER)
+        model?.addParameterValue(idParamAngleY, dragY * DRAG_ANGLE_MULTIPLIER)
+        model?.addParameterValue(idParamAngleZ, dragX * dragY * -DRAG_ANGLE_MULTIPLIER)
 
         // ドラッグによる体の向きの調整
-        model?.addParameterValue(idParamBodyAngleX, dragX * 10) // -10から10の値を加える
+        model?.addParameterValue(idParamBodyAngleX, dragX * DRAG_BODY_ANGLE_MULTIPLIER)
 
         // ドラッグによる目の向きの調整
-        model?.addParameterValue(idParamEyeBallX, dragX) // -1から1の値を加える
-        model?.addParameterValue(idParamEyeBallY, dragY)
+        model?.addParameterValue(idParamEyeBallX, dragX * DRAG_EYE_BALL_MULTIPLIER)
+        model?.addParameterValue(idParamEyeBallY, dragY * DRAG_EYE_BALL_MULTIPLIER)
 
         // 呼吸など
         breath?.let {
@@ -483,7 +492,7 @@ class LAppModel : CubismUserModel() {
             val value = 0.0f // リアルタイムでリップシンクを行う場合、システムから音量を取得して、0〜1の範囲で値を入力します。
 
             for (i in lipSyncIds.indices) {
-                model?.addParameterValue(lipSyncIds[i], value, 0.8f)
+                model?.addParameterValue(lipSyncIds[i], value, LIP_SYNC_WEIGHT)
             }
         }
 
@@ -751,6 +760,40 @@ class LAppModel : CubismUserModel() {
     }
 
     companion object {
+        // 拖拽参数倍率常量
+        private const val DRAG_ANGLE_MULTIPLIER = 30f
+        private const val DRAG_BODY_ANGLE_MULTIPLIER = 10f
+        private const val DRAG_EYE_BALL_MULTIPLIER = 1f
+        
+        // 呼吸参数常量
+        private const val BREATH_ANGLE_X_OFFSET = 0.0f
+        private const val BREATH_ANGLE_X_PEAK = 15.0f
+        private const val BREATH_ANGLE_X_CYCLE = 6.5345f
+        private const val BREATH_ANGLE_X_WEIGHT = 0.5f
+        
+        private const val BREATH_ANGLE_Y_OFFSET = 0.0f
+        private const val BREATH_ANGLE_Y_PEAK = 8.0f
+        private const val BREATH_ANGLE_Y_CYCLE = 3.5345f
+        private const val BREATH_ANGLE_Y_WEIGHT = 0.5f
+        
+        private const val BREATH_ANGLE_Z_OFFSET = 0.0f
+        private const val BREATH_ANGLE_Z_PEAK = 10.0f
+        private const val BREATH_ANGLE_Z_CYCLE = 5.5345f
+        private const val BREATH_ANGLE_Z_WEIGHT = 0.5f
+        
+        private const val BREATH_BODY_ANGLE_X_OFFSET = 0.0f
+        private const val BREATH_BODY_ANGLE_X_PEAK = 4.0f
+        private const val BREATH_BODY_ANGLE_X_CYCLE = 15.5345f
+        private const val BREATH_BODY_ANGLE_X_WEIGHT = 0.5f
+        
+        private const val BREATH_PARAM_OFFSET = 0.5f
+        private const val BREATH_PARAM_PEAK = 0.5f
+        private const val BREATH_PARAM_CYCLE = 3.2345f
+        private const val BREATH_PARAM_WEIGHT = 0.5f
+        
+        // 口型同步参数
+        private const val LIP_SYNC_WEIGHT = 0.8f
+        
         /**
          * ファイルをバイト配列として読み込む
          *
@@ -773,40 +816,58 @@ class LAppModel : CubismUserModel() {
     }
 
     private fun setupModel(setting: ICubismModelSetting) {
+        modelHomeDirectory = ""
+        setupModelInternal(setting, "setupModel", initializeRenderer = false)
+    }
+    
+    /**
+     * 内部方法：统一的模型设置逻辑
+     * @param setting 模型设置
+     * @param logPrefix 日志前缀
+     * @param initializeRenderer 是否在设置后初始化渲染器
+     */
+    private fun setupModelInternal(
+        setting: ICubismModelSetting,
+        logPrefix: String,
+        initializeRenderer: Boolean
+    ) {
         isUpdated = true
         isInitialized = false
-
         modelSetting = setting
-        modelHomeDirectory = ""
 
         // CubismModel
         if (LAppDefine.DEBUG_LOG_ENABLE) {
-            LAppPal.printLog("setupModel: Starting model setup")
+            LAppPal.printLog("$logPrefix: Starting model setup")
         }
 
         // Load Cubism Model
         run {
             val fileName = modelSetting?.modelFileName ?: ""
-            LAppPal.printLog("setupModel: Model file name: $fileName")
+            if (LAppDefine.DEBUG_LOG_ENABLE) {
+                LAppPal.printLog("$logPrefix: Model file name: $fileName")
+            }
             if (fileName.isNotEmpty()) {
                 val path = modelHomeDirectory + fileName
-                LAppPal.printLog("setupModel: Full model path: $path")
-
                 if (LAppDefine.DEBUG_LOG_ENABLE) {
-                    LAppPal.printLog("create model: ${modelSetting?.modelFileName}")
+                    LAppPal.printLog("$logPrefix: Full model path: $path")
+                    LAppPal.printLog("$logPrefix: create model: ${modelSetting?.modelFileName}")
                 }
 
                 val buffer = createBufferFromFileSystem(path)
-                LAppPal.printLog("setupModel: Buffer size: ${buffer?.size ?: "null"}")
+                if (LAppDefine.DEBUG_LOG_ENABLE) {
+                    LAppPal.printLog("$logPrefix: Buffer size: ${buffer?.size ?: "null"}")
+                }
 
                 if (buffer != null) {
                     loadModel(buffer, mocConsistency)
-                    LAppPal.printLog("setupModel: Model loaded, getModel() result: ${if (model != null) "not null" else "null"}")
+                    if (LAppDefine.DEBUG_LOG_ENABLE) {
+                        LAppPal.printLog("$logPrefix: Model loaded, getModel() result: ${if (model != null) "not null" else "null"}")
+                    }
                 } else {
-                    LAppPal.printLog("setupModel: ERROR - Failed to create buffer for model file")
+                    LAppPal.printLog("$logPrefix: ERROR - Failed to create buffer for model file")
                 }
             } else {
-                LAppPal.printLog("setupModel: ERROR - Model file name is empty")
+                LAppPal.printLog("$logPrefix: ERROR - Model file name is empty")
             }
         }
 
@@ -860,11 +921,11 @@ class LAppModel : CubismUserModel() {
         breath = CubismBreath.create()
         val breathParameters = mutableListOf<CubismBreath.BreathParameterData>()
 
-        breathParameters.add(CubismBreath.BreathParameterData(idParamAngleX, 0.0f, 15.0f, 6.5345f, 0.5f))
-        breathParameters.add(CubismBreath.BreathParameterData(idParamAngleY, 0.0f, 8.0f, 3.5345f, 0.5f))
-        breathParameters.add(CubismBreath.BreathParameterData(idParamAngleZ, 0.0f, 10.0f, 5.5345f, 0.5f))
-        breathParameters.add(CubismBreath.BreathParameterData(idParamBodyAngleX, 0.0f, 4.0f, 15.5345f, 0.5f))
-        breathParameters.add(CubismBreath.BreathParameterData(CubismFramework.getIdManager().getId(ParameterId.BREATH.id), 0.5f, 0.5f, 3.2345f, 0.5f))
+        breathParameters.add(CubismBreath.BreathParameterData(idParamAngleX, BREATH_ANGLE_X_OFFSET, BREATH_ANGLE_X_PEAK, BREATH_ANGLE_X_CYCLE, BREATH_ANGLE_X_WEIGHT))
+        breathParameters.add(CubismBreath.BreathParameterData(idParamAngleY, BREATH_ANGLE_Y_OFFSET, BREATH_ANGLE_Y_PEAK, BREATH_ANGLE_Y_CYCLE, BREATH_ANGLE_Y_WEIGHT))
+        breathParameters.add(CubismBreath.BreathParameterData(idParamAngleZ, BREATH_ANGLE_Z_OFFSET, BREATH_ANGLE_Z_PEAK, BREATH_ANGLE_Z_CYCLE, BREATH_ANGLE_Z_WEIGHT))
+        breathParameters.add(CubismBreath.BreathParameterData(idParamBodyAngleX, BREATH_BODY_ANGLE_X_OFFSET, BREATH_BODY_ANGLE_X_PEAK, BREATH_BODY_ANGLE_X_CYCLE, BREATH_BODY_ANGLE_X_WEIGHT))
+        breathParameters.add(CubismBreath.BreathParameterData(CubismFramework.getIdManager().getId(ParameterId.BREATH.id), BREATH_PARAM_OFFSET, BREATH_PARAM_PEAK, BREATH_PARAM_CYCLE, BREATH_PARAM_WEIGHT))
 
         breath?.setParameters(breathParameters)
 
@@ -897,7 +958,7 @@ class LAppModel : CubismUserModel() {
         }
 
         if (modelSetting == null || modelMatrix == null) {
-            LAppPal.printLog("Failed to setupModel().")
+            LAppPal.printLog("Failed to $logPrefix().")
             return
         }
 
@@ -908,14 +969,14 @@ class LAppModel : CubismUserModel() {
         if (modelSetting?.getLayoutMap(layout) == true) {
             modelMatrix?.setupFromLayout(layout)
             if (LAppDefine.DEBUG_LOG_ENABLE) {
-                android.util.Log.d("LAppModel", "setupModel: Layout found and applied to modelMatrix")
+                LAppPal.printLog("$logPrefix: Layout found and applied to modelMatrix")
                 for ((key, value) in layout) {
-                    android.util.Log.d("LAppModel", "Layout: $key = $value")
+                    LAppPal.printLog("$logPrefix: Layout: $key = $value")
                 }
             }
         } else {
             if (LAppDefine.DEBUG_LOG_ENABLE) {
-                android.util.Log.d("LAppModel", "setupModel: No layout information found, using default modelMatrix")
+                LAppPal.printLog("$logPrefix: No layout information found, using default modelMatrix")
             }
         }
 
@@ -929,6 +990,21 @@ class LAppModel : CubismUserModel() {
         }
 
         motionManager.stopAllMotions()
+
+        // 根据参数决定是否初始化渲染器
+        if (initializeRenderer) {
+            try {
+                val renderer = CubismRendererAndroid.create()
+                setupRenderer(renderer)
+                if (LAppDefine.DEBUG_LOG_ENABLE) {
+                    LAppPal.printLog("$logPrefix: Renderer created and initialized after model loading")
+                }
+            } catch (e: Exception) {
+                if (LAppDefine.DEBUG_LOG_ENABLE) {
+                    LAppPal.printLog("$logPrefix: Renderer creation/initialization failed: ${e.message}")
+                }
+            }
+        }
 
         isUpdated = false
         isInitialized = true
@@ -936,172 +1012,8 @@ class LAppModel : CubismUserModel() {
 
     // model3.jsonからモデルを生成する (from file system)
     private fun setupModelFromFileSystem(setting: ICubismModelSetting, modelDirectory: String) {
-        modelSetting = setting
         modelHomeDirectory = modelDirectory
-
-        isUpdated = true
-        isInitialized = false
-
-        // Load Cubism Model
-        run {
-            val fileName = modelSetting?.modelFileName ?: ""
-            if (fileName.isNotEmpty()) {
-                val path = modelHomeDirectory + fileName
-
-                if (LAppDefine.DEBUG_LOG_ENABLE) {
-                    LAppPal.printLog("setupModelFromFileSystem: ${modelSetting?.modelFileName}")
-                }
-
-                val buffer = createBufferFromFileSystem(path)
-                loadModel(buffer, mocConsistency)
-            }
-        }
-
-        // load expression files(.exp3.json)
-        run {
-            val expressionCount = modelSetting?.expressionCount ?: 0
-            if (expressionCount > 0) {
-                for (i in 0 until expressionCount) {
-                    val name = modelSetting?.getExpressionName(i) ?: ""
-                    var path = modelSetting?.getExpressionFileName(i) ?: ""
-                    path = modelHomeDirectory + path
-
-                    val buffer = createBufferFromFileSystem(path)
-                    val motion = loadExpression(buffer)
-
-                    if (motion != null) {
-                        expressions[name] = motion
-                    }
-                }
-            }
-        }
-
-        // Physics
-        run {
-            val path = modelSetting?.physicsFileName ?: ""
-            if (path.isNotEmpty()) {
-                val modelPath = modelHomeDirectory + path
-                val buffer = createBufferFromFileSystem(modelPath)
-
-                loadPhysics(buffer)
-            }
-        }
-
-        // Pose
-        run {
-            val path = modelSetting?.poseFileName ?: ""
-            if (path.isNotEmpty()) {
-                val modelPath = modelHomeDirectory + path
-                val buffer = createBufferFromFileSystem(modelPath)
-                loadPose(buffer)
-            }
-        }
-
-        // Load eye blink data
-        val eyeBlinkParameterCount = modelSetting?.eyeBlinkParameterCount ?: 0
-        if (eyeBlinkParameterCount > 0) {
-            eyeBlink = CubismEyeBlink.create(modelSetting)
-        }
-
-        // Load Breath Data
-        breath = CubismBreath.create()
-        val breathParameters = mutableListOf<CubismBreath.BreathParameterData>()
-
-        breathParameters.add(CubismBreath.BreathParameterData(idParamAngleX, 0.0f, 15.0f, 6.5345f, 0.5f))
-        breathParameters.add(CubismBreath.BreathParameterData(idParamAngleY, 0.0f, 8.0f, 3.5345f, 0.5f))
-        breathParameters.add(CubismBreath.BreathParameterData(idParamAngleZ, 0.0f, 10.0f, 5.5345f, 0.5f))
-        breathParameters.add(CubismBreath.BreathParameterData(idParamBodyAngleX, 0.0f, 4.0f, 15.5345f, 0.5f))
-        breathParameters.add(CubismBreath.BreathParameterData(CubismFramework.getIdManager().getId(ParameterId.BREATH.id), 0.5f, 0.5f, 3.2345f, 0.5f))
-
-        breath?.setParameters(breathParameters)
-
-        // Load UserData
-        run {
-            val path = modelSetting?.userDataFile ?: ""
-            if (path.isNotEmpty()) {
-                val modelPath = modelHomeDirectory + path
-                val buffer = createBufferFromFileSystem(modelPath)
-                loadUserData(buffer)
-            }
-        }
-
-        // EyeBlinkIds
-        val eyeBlinkIdCount = modelSetting?.eyeBlinkParameterCount ?: 0
-        for (i in 0 until eyeBlinkIdCount) {
-            val id = modelSetting?.getEyeBlinkParameterId(i)
-            if (id != null) {
-                eyeBlinkIds.add(id)
-            }
-        }
-
-        // LipSyncIds
-        val lipSyncIdCount = modelSetting?.lipSyncParameterCount ?: 0
-        for (i in 0 until lipSyncIdCount) {
-            val id = modelSetting?.getLipSyncParameterId(i)
-            if (id != null) {
-                lipSyncIds.add(id)
-            }
-        }
-
-        if (modelSetting == null || modelMatrix == null) {
-            LAppPal.printLog("Failed to setupModelFromFileSystem().")
-            return
-        }
-
-        // Set layout
-        val layout = mutableMapOf<String, Float>()
-
-        // レイアウト情報が存在すればその情報からモデル行列をセットアップする
-        if (modelSetting?.getLayoutMap(layout) == true) {
-            if (LAppDefine.DEBUG_LOG_ENABLE) {
-                LAppPal.printLog("setupModelFromFileSystem: Layout found and applied to modelMatrix")
-                for ((key, value) in layout) {
-                    LAppPal.printLog("setupModelFromFileSystem: Layout: $key = $value")
-                }
-            }
-            modelMatrix?.setupFromLayout(layout)
-        } else {
-            if (LAppDefine.DEBUG_LOG_ENABLE) {
-                LAppPal.printLog("setupModelFromFileSystem: No layout information found, using default modelMatrix")
-            }
-        }
-
-        model?.saveParameters()
-
-        // Load motions
-        val motionGroupCount = modelSetting?.motionGroupCount ?: 0
-        for (i in 0 until motionGroupCount) {
-            val group = modelSetting?.getMotionGroupName(i) ?: ""
-            preLoadMotionGroupFromFileSystem(group)
-        }
-
-        motionManager.stopAllMotions()
-
-        // 使用官方示例的方法创建和初始化渲染器
-        try {
-            // 方法1: 使用官方示例的方法创建渲染器
-            val renderer = CubismRendererAndroid.create()
-            if (LAppDefine.DEBUG_LOG_ENABLE) {
-                LAppPal.printLog("setupModelFromFileSystem: renderer created using CubismRendererAndroid.create()")
-            }
-            
-            // 方法2: 使用官方示例的方法设置渲染器
-            setupRenderer(renderer)
-            if (LAppDefine.DEBUG_LOG_ENABLE) {
-                LAppPal.printLog("setupModelFromFileSystem: renderer set using setupRenderer()")
-            }
-            
-            if (LAppDefine.DEBUG_LOG_ENABLE) {
-                LAppPal.printLog("setupModelFromFileSystem: renderer created and initialized after model loading")
-            }
-        } catch (e: Exception) {
-            if (LAppDefine.DEBUG_LOG_ENABLE) {
-                LAppPal.printLog("setupModelFromFileSystem: renderer creation/initialization failed: ${e.message}")
-            }
-        }
-
-        isUpdated = false
-        isInitialized = true
+        setupModelInternal(setting, "setupModelFromFileSystem", initializeRenderer = true)
     }
 
     /**
