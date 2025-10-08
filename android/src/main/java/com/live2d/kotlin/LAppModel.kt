@@ -230,17 +230,13 @@ class LAppModel : CubismUserModel() {
      * 释放模型资源
      */
     fun deleteModel() {
-        if (LAppDefine.DEBUG_LOG_ENABLE) {
-            LAppPal.printLog("deleteModel: Starting model cleanup")
-        }
+        LAppPal.printLogLazy { "deleteModel: Starting model cleanup" }
         
         try {
             // 1. 停止所有动作（优先停止，避免后续访问已清理的资源）
             try {
                 motionManager.stopAllMotions()
-                if (LAppDefine.DEBUG_LOG_ENABLE) {
-                    LAppPal.printLog("deleteModel: Motion manager stopped")
-                }
+                LAppPal.printLogLazy { "deleteModel: Motion manager stopped" }
             } catch (e: Exception) {
                 LAppPal.printLog("deleteModel: Error stopping motions: ${e.message}")
             }
@@ -252,54 +248,40 @@ class LAppModel : CubismUserModel() {
             synchronized(motions) {
                 motions.clear()
             }
-            if (LAppDefine.DEBUG_LOG_ENABLE) {
-                LAppPal.printLog("deleteModel: Expressions and motions cleared")
-            }
+            LAppPal.printLogLazy { "deleteModel: Expressions and motions cleared" }
             
             // 3. 清理离屏渲染缓冲
             try {
                 renderingBuffer.destroyOffscreenSurface()
-                if (LAppDefine.DEBUG_LOG_ENABLE) {
-                    LAppPal.printLog("deleteModel: Rendering buffer destroyed")
-                }
+                LAppPal.printLogLazy { "deleteModel: Rendering buffer destroyed" }
             } catch (e: Exception) {
                 LAppPal.printLog("deleteModel: Error destroying rendering buffer: ${e.message}")
             }
             
             // 4. 清空待绑定纹理（已是线程安全的集合）
             pendingTextures.clear()
-            if (LAppDefine.DEBUG_LOG_ENABLE) {
-                LAppPal.printLog("deleteModel: Pending textures cleared")
-            }
+            LAppPal.printLogLazy { "deleteModel: Pending textures cleared" }
             
             // 5. 释放效果系统资源
             eyeBlink = null
             breath = null
             pose = null
             physics = null
-            if (LAppDefine.DEBUG_LOG_ENABLE) {
-                LAppPal.printLog("deleteModel: Effect systems released")
-            }
+            LAppPal.printLogLazy { "deleteModel: Effect systems released" }
             
             // 6. 清空参数ID列表
             eyeBlinkIds.clear()
             lipSyncIds.clear()
-            if (LAppDefine.DEBUG_LOG_ENABLE) {
-                LAppPal.printLog("deleteModel: Parameter ID lists cleared")
-            }
+            LAppPal.printLogLazy { "deleteModel: Parameter ID lists cleared" }
             
             // 7. 清理模型设置（保留 modelHomeDirectory 以便调试）
             modelSetting = null
-            if (LAppDefine.DEBUG_LOG_ENABLE) {
-                LAppPal.printLog("deleteModel: Model settings cleared")
-            }
+            LAppPal.printLogLazy { "deleteModel: Model settings cleared" }
             
             // 注意：纹理资源由 LAppTextureManager 统一管理，在 LAppDelegate.onStop() 中释放
             // 这里不直接删除纹理，避免影响其他可能共享纹理的模型
             
-            if (LAppDefine.DEBUG_LOG_ENABLE) {
-                LAppPal.printLog("deleteModel: Model cleanup completed successfully")
-            }
+            LAppPal.printLogLazy { "deleteModel: Model cleanup completed successfully" }
         } catch (e: Exception) {
             LAppPal.printLog("deleteModel: Unexpected error during cleanup: ${e.message}")
             e.printStackTrace()
@@ -368,15 +350,11 @@ class LAppModel : CubismUserModel() {
      */
     private fun initializeRenderer() {
         try {
-            if (LAppDefine.DEBUG_LOG_ENABLE) {
-                LAppPal.printLog("initializeRenderer: Attempting to initialize renderer")
-            }
+            LAppPal.printLogLazy { "initializeRenderer: Attempting to initialize renderer" }
             
             // 检查模型是否已加载
             if (model == null) {
-                if (LAppDefine.DEBUG_LOG_ENABLE) {
-                    LAppPal.printLog("initializeRenderer: Model is null, cannot initialize renderer")
-                }
+                LAppPal.printLogLazy { "initializeRenderer: Model is null, cannot initialize renderer" }
                 return
             }
             
@@ -384,42 +362,27 @@ class LAppModel : CubismUserModel() {
             try {
                 // 方法1: 使用官方示例的方法创建渲染器
                 val renderer = CubismRendererAndroid.create()
-                if (LAppDefine.DEBUG_LOG_ENABLE) {
-                    LAppPal.printLog("initializeRenderer: renderer created using CubismRendererAndroid.create()")
-                }
+                LAppPal.printLogLazy { "initializeRenderer: renderer created using CubismRendererAndroid.create()" }
                 
                 // 方法2: 使用官方示例的方法设置渲染器
                 setupRenderer(renderer)
-                if (LAppDefine.DEBUG_LOG_ENABLE) {
-                    LAppPal.printLog("initializeRenderer: renderer set using setupRenderer()")
-                }
-                
-                if (LAppDefine.DEBUG_LOG_ENABLE) {
-                    LAppPal.printLog("initializeRenderer: renderer created and initialized successfully")
-                }
+                LAppPal.printLogLazy { "initializeRenderer: renderer set using setupRenderer()" }
+                LAppPal.printLogLazy { "initializeRenderer: renderer created and initialized successfully" }
             } catch (e: Exception) {
-                if (LAppDefine.DEBUG_LOG_ENABLE) {
-                    LAppPal.printLog("initializeRenderer: renderer creation/initialization failed: ${e.message}")
-                }
+                LAppPal.printLogLazy { "initializeRenderer: renderer creation/initialization failed: ${e.message}" }
             }
             
             // 检查渲染器是否现在可用
             val renderer = getRenderer<CubismRendererAndroid>()
             if (renderer != null) {
-                if (LAppDefine.DEBUG_LOG_ENABLE) {
-                    LAppPal.printLog("initializeRenderer: Renderer is now available")
-                }
+                LAppPal.printLogLazy { "initializeRenderer: Renderer is now available" }
                 // 如果渲染器现在可用，尝试绑定延迟的纹理
                 bindPendingTextures()
             } else {
-                if (LAppDefine.DEBUG_LOG_ENABLE) {
-                    LAppPal.printLog("initializeRenderer: Renderer is still null after createRenderer() attempt")
-                }
+                LAppPal.printLogLazy { "initializeRenderer: Renderer is still null after createRenderer() attempt" }
             }
         } catch (e: Exception) {
-            if (LAppDefine.DEBUG_LOG_ENABLE) {
-                LAppPal.printLog("initializeRenderer: Failed to initialize renderer: ${e.message}")
-            }
+            LAppPal.printLogLazy { "initializeRenderer: Failed to initialize renderer: ${e.message}" }
         }
     }
 
@@ -594,57 +557,26 @@ class LAppModel : CubismUserModel() {
     }
 
     fun draw(matrix: CubismMatrix44) {
-        // if (LAppDefine.DEBUG_LOG_ENABLE) {
-        //     LAppPal.printLog("draw: Starting draw process, model is ${if (model != null) "not null" else "null"}")
-        // }
-        
         if (model == null) {
-            // if (LAppDefine.DEBUG_LOG_ENABLE) {
-            //     LAppPal.printLog("draw: Model is null, skipping draw")
-            // }
             return
         }
 
         // 检查渲染器是否可用
         val renderer = getRenderer<CubismRendererAndroid>()
         if (renderer == null) {
-            if (LAppDefine.DEBUG_LOG_ENABLE) {
-                LAppPal.printLog("draw: Renderer is null, skipping draw")
-            }
+            LAppPal.printLogLazy { "draw: Renderer is null, skipping draw" }
             return
         }
 
-        // if (LAppDefine.DEBUG_LOG_ENABLE) {
-        //     LAppPal.printLog("draw: Renderer is available, proceeding with draw")
-        // }
-
         // 使用官方示例的矩阵乘法方法
         // キャッシュ変数の定義を避けるために、multiplyByMatrix()ではなく、multiply()を使用する。
-        // 减少调试日志
-        // if (LAppDefine.DEBUG_LOG_ENABLE) {
-        //     LAppPal.printLog("draw: Before matrix multiplication")
-        //     LAppPal.printLog("draw: modelMatrix is null: ${modelMatrix == null}")
-        //     if (modelMatrix != null) {
-        //         LAppPal.printLog("draw: modelMatrix values: ${modelMatrix.getArray().contentToString()}")
-        //     }
-        //     LAppPal.printLog("draw: projection matrix values: ${matrix.getArray().contentToString()}")
-        // }
-        
         if (modelMatrix != null) {
             CubismMatrix44.multiply(
                 modelMatrix.getArray(),
                 matrix.getArray(),
                 matrix.getArray()
             )
-            
-            // if (LAppDefine.DEBUG_LOG_ENABLE) {
-            //     LAppPal.printLog("draw: After matrix multiplication")
-            //     LAppPal.printLog("draw: Result matrix values: ${matrix.getArray().contentToString()}")
-            // }
         } else {
-            // if (LAppDefine.DEBUG_LOG_ENABLE) {
-            //     LAppPal.printLog("draw: modelMatrix is null, using identity matrix")
-            // }
             // 如果 modelMatrix 为 null，使用单位矩阵
             matrix.loadIdentity()
         }
@@ -657,18 +589,12 @@ class LAppModel : CubismUserModel() {
                 bindPendingTextures()
             } catch (e: Exception) {
                 // 记录错误但不中断渲染，后续帧继续尝试
-                if (LAppDefine.DEBUG_LOG_ENABLE) {
-                    LAppPal.printLog("draw: Failed to bind pending textures: ${e.message}")
-                }
+                LAppPal.printLogLazy { "draw: Failed to bind pending textures: ${e.message}" }
             }
         }
 
         // 使用官方示例的方法绘制模型
         renderer.drawModel()
-        
-        // if (LAppDefine.DEBUG_LOG_ENABLE) {
-        //     LAppPal.printLog("draw: renderer.drawModel() completed")
-        // }
     }
 
     /**
