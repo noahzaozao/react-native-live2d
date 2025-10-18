@@ -77,14 +77,33 @@ class ReactNativeLive2dView(context: Context, appContext: AppContext) :
     }
 
     init {
+        Log.d(TAG, "🎨 [Init] ReactNativeLive2dView initialization started (Thread: ${Thread.currentThread().name})")
+        
         if (LAppDefine.DEBUG_LOG_ENABLE) {
             Log.d(TAG, "init")
         }
 
         initializeComponents()
 
+        // 关键修复：CubismFramework 必须在 GL 线程中初始化
+        // 否则在 GL 线程中调用 getIdManager() 会返回 null
         val activity = getActivity()
-        activity?.let { delegate.onStart(it) }
+        activity?.let { act ->
+            Log.d(TAG, "🎨 [Init] Scheduling delegate.onStart() to run in GL thread")
+            runAfterGLReady("delegate_onStart") {
+                try {
+                    Log.d(TAG, "🎨 [GL Thread] Calling delegate.onStart() (Thread: ${Thread.currentThread().name})")
+                    delegate.onStart(act)
+                    Log.d(TAG, "✅ [GL Thread] delegate.onStart() completed successfully")
+                } catch (e: Exception) {
+                    Log.e(TAG, "❌ [GL Thread] delegate.onStart() failed: ${e.message}", e)
+                }
+            }
+        } ?: run {
+            Log.w(TAG, "⚠️ [Init] Activity is null, cannot start delegate")
+        }
+        
+        Log.d(TAG, "✅ [Init] ReactNativeLive2dView initialization completed")
     }
 
     private fun initializeComponents() {
@@ -167,6 +186,8 @@ class ReactNativeLive2dView(context: Context, appContext: AppContext) :
     }
 
     private fun runAfterGLReady(operationKey: String, action: () -> Unit) {
+        Log.d(TAG, "⏳ [runAfterGLReady] Scheduling operation: '$operationKey'")
+        
         if (pendingOperations.contains(operationKey)) {
             Log.d(
                     TAG,
@@ -177,15 +198,20 @@ class ReactNativeLive2dView(context: Context, appContext: AppContext) :
         pendingOperations.add(operationKey)
 
         val handler = android.os.Handler(context.mainLooper)
+        var checkCount = 0
         val checker =
                 object : Runnable {
                     override fun run() {
                         try {
+                            checkCount++
                             if (isGLSetupComplete && ::glSurfaceView.isInitialized) {
+                                Log.d(TAG, "✅ [runAfterGLReady] GL ready after $checkCount checks, executing '$operationKey'")
                                 try {
                                     glSurfaceView.queueEvent {
                                         try {
+                                            Log.d(TAG, "🚀 [GL Thread] Executing operation: '$operationKey'")
                                             action()
+                                            Log.d(TAG, "✅ [GL Thread] Operation completed: '$operationKey'")
                                         } finally {
                                             pendingOperations.remove(operationKey)
                                         }
@@ -195,6 +221,9 @@ class ReactNativeLive2dView(context: Context, appContext: AppContext) :
                                     pendingOperations.remove(operationKey)
                                 }
                             } else {
+                                if (checkCount % 10 == 0) {
+                                    Log.d(TAG, "⏳ [runAfterGLReady] Still waiting for GL (check #$checkCount)...")
+                                }
                                 handler.postDelayed(this, 16)
                             }
                         } catch (e: Exception) {
@@ -216,25 +245,40 @@ class ReactNativeLive2dView(context: Context, appContext: AppContext) :
      * Note: Duplicate calls with the same path will be skipped automatically
      */
     fun loadModel(modelPath: String) {
-        Log.d(TAG, "loadModel: $modelPath")
+        Log.d(TAG, "📥 [loadModel] Received request to load: $modelPath")
 
         // 去重检查：如果已经加载了相同的模型路径，则跳过
         if (this.modelPath == modelPath && isInitialized) {
-            Log.d(TAG, "loadModel: model '$modelPath' already loaded, skipping")
+            Log.d(TAG, "✅ [loadModel] Model '$modelPath' already loaded, skipping")
             return
         }
 
         this.modelPath = modelPath
 
         try {
-            Log.d(TAG, "loadModel: starting model loading process")
+            Log.d(TAG, "🚀 [loadModel] Starting model loading process")
+            
+            // 检查 delegate 是否已准备好
+            val delegateReady = delegate.getView() != null && delegate.getTextureManager() != null
+            Log.d(TAG, "🔍 [loadModel] Delegate ready check: view=${delegate.getView() != null}, textureManager=${delegate.getTextureManager() != null}")
+
+            // 如果 delegate 还未准备好，等待一下
+            if (!delegateReady) {
+                Log.w(TAG, "⚠️ [loadModel] Delegate not ready yet, scheduling retry...")
+                val handler = android.os.Handler(context.mainLooper)
+                handler.postDelayed({
+                    Log.d(TAG, "🔄 [loadModel] Retrying model load after delegate initialization")
+                    loadModel(modelPath)
+                }, 100)
+                return
+            }
 
             // 确保在 GL 线程加载模型与创建纹理
-            Log.d(TAG, "loadModel before queueEvent")
+            Log.d(TAG, "📤 [loadModel] Queueing model load to GL thread")
 
             glSurfaceView.queueEvent {
                 try {
-                    Log.d(TAG, "loadModel queueEvent try")
+                    Log.d(TAG, "🎬 [GL Thread] Model load execution started")
 
                     val manager = LAppLive2DManager.getInstance()
 

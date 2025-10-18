@@ -67,6 +67,9 @@ class LAppDelegate private constructor() {
                     // 标记为关闭状态
                     instance.isShuttingDown = true
                     
+                    // 重置 Framework 初始化标志，允许下次重新初始化
+                    instance.isFrameworkInitialized = false
+                    
                     // 清空引用，允许垃圾回收
                     INSTANCE = null
                     
@@ -122,15 +125,19 @@ class LAppDelegate private constructor() {
      */
     private var mouseY: Float = 0f
 
+    /**
+     * 标记 CubismFramework 是否已初始化
+     */
+    @Volatile
+    private var isFrameworkInitialized: Boolean = false
+
     init {
         currentModel = 0
 
-        // Set up Cubism SDK framework.
+        // 配置 Cubism SDK 选项
+        // 注意：不在这里调用 startUp()，因为必须在 GL 线程中初始化
         cubismOption.logFunction = LAppPal.PrintLogFunction()
         cubismOption.loggingLevel = LAppDefine.cubismLoggingLevel
-
-        CubismFramework.cleanUp()
-        CubismFramework.startUp(cubismOption)
     }
 
     /**
@@ -159,13 +166,41 @@ class LAppDelegate private constructor() {
     }
 
     fun onStart(activity: Activity) {
+        Log.d("LAppDelegate", "🎨 [onStart] Starting (Thread: ${Thread.currentThread().name})")
+        
         if (LAppDefine.DEBUG_LOG_ENABLE) {
-            LAppPal.printLog("LAppDelegate.onStart: Initializing textureManager")
+            LAppPal.printLog("LAppDelegate.onStart: Starting initialization")
         }
         
         // 重置关闭标志，允许重新使用
         synchronized(this) {
             isShuttingDown = false
+        }
+        
+        // 初始化 CubismFramework（必须在 GL 线程中调用）
+        if (!isFrameworkInitialized) {
+            Log.d("LAppDelegate", "🔧 [onStart] Initializing CubismFramework...")
+            
+            try {
+                CubismFramework.cleanUp()
+                CubismFramework.startUp(cubismOption)
+                isFrameworkInitialized = true
+                
+                Log.d("LAppDelegate", "✅ [onStart] CubismFramework initialized successfully")
+                
+                if (LAppDefine.DEBUG_LOG_ENABLE) {
+                    LAppPal.printLog("LAppDelegate.onStart: CubismFramework initialized")
+                }
+            } catch (e: Exception) {
+                Log.e("LAppDelegate", "❌ [onStart] Failed to initialize CubismFramework: ${e.message}", e)
+                throw e
+            }
+        } else {
+            Log.d("LAppDelegate", "ℹ️ [onStart] CubismFramework already initialized, skipping")
+        }
+        
+        if (LAppDefine.DEBUG_LOG_ENABLE) {
+            LAppPal.printLog("LAppDelegate.onStart: Initializing textureManager")
         }
         
         textureManager = LAppTextureManager()
@@ -178,6 +213,8 @@ class LAppDelegate private constructor() {
         if (LAppDefine.DEBUG_LOG_ENABLE) {
             LAppPal.printLog("LAppDelegate.onStart: textureManager initialized: ${textureManager != null}")
         }
+        
+        Log.d("LAppDelegate", "✅ [onStart] Initialization completed")
     }
 
     fun onPause() {}
