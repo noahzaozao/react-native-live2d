@@ -288,5 +288,42 @@ class ReactNativeLive2dModule : Module() {
                 promise.reject("EXPRESSION_ERROR", "Failed to set expression: ${e.message}", e)
             }
         }
+        
+        /**
+         * 设置口型同步值（用于实时口型同步）
+         * 
+         * @param value 嘴巴开合度（0.0 ~ 1.0）
+         */
+        Function("setMouthValue") { value: Float ->
+            try {
+                val manager = LAppLive2DManager.getInstance()
+                val currentModel = manager.getModel(0)
+                
+                if (currentModel != null) {
+                    currentModel.setMouthValue(value)
+                } else {
+                    Log.w(TAG, "Cannot set mouth value: No model loaded")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to set mouth value: ${e.message}")
+            }
+        }
+        
+        /**
+         * 获取当前口型同步值
+         * 
+         * @return 当前嘴巴开合度（0.0 ~ 1.0）
+         */
+        Function("getMouthValue") {
+            try {
+                val manager = LAppLive2DManager.getInstance()
+                val currentModel = manager.getModel(0)
+                
+                currentModel?.getMouthValue() ?: 0.0f
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to get mouth value: ${e.message}")
+                0.0f
+            }
+        }
     }
 }

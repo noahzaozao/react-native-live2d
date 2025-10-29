@@ -59,6 +59,13 @@ class LAppModel : CubismUserModel() {
     private val lipSyncIds: MutableList<CubismId> = ArrayList()
     
     /**
+     * 外部から設定される口型同步値（0.0 ~ 1.0）
+     * 用于实时口型同步，通过振幅分析更新
+     */
+    @Volatile
+    private var externalMouthValue: Float = 0.0f
+    
+    /**
      * 読み込まれているモーションのマップ
      */
     private val motions: MutableMap<String, ACubismMotion> = HashMap()
@@ -502,8 +509,9 @@ class LAppModel : CubismUserModel() {
 
         // リップシンクの設定
         if (lipSync) {
-            // リアルタイムでリップシンクを行う場合、システムから音量を取得して、0〜1の範囲で値を入力します。
-            val value = 0.0f // リアルタイムでリップシンクを行う場合、システムから音量を取得して、0〜1の範囲で値を入力します。
+            // 使用外部设置的口型值（来自音频振幅分析）
+            // 如果 externalMouthValue > 0，优先使用外部值
+            val value = if (externalMouthValue > 0.0f) externalMouthValue else 0.0f
 
             for (i in lipSyncIds.indices) {
                 model?.addParameterValue(lipSyncIds[i], value, LIP_SYNC_WEIGHT)
@@ -700,6 +708,25 @@ class LAppModel : CubismUserModel() {
                 LAppPal.printLog("expression[$expressionID] is null")
             }
         }
+    }
+    
+    /**
+     * 外部から口型同步値を設定する（リアルタイム口型同步用）
+     * 
+     * @param value 嘴巴开合度（0.0 ~ 1.0），0.0 为闭合，1.0 为完全张开
+     */
+    fun setMouthValue(value: Float) {
+        // 限制值在 0.0 ~ 1.0 范围内
+        externalMouthValue = value.coerceIn(0.0f, 1.0f)
+    }
+    
+    /**
+     * 获取当前口型同步值
+     * 
+     * @return 当前嘴巴开合度（0.0 ~ 1.0）
+     */
+    fun getMouthValue(): Float {
+        return externalMouthValue
     }
 
     /**

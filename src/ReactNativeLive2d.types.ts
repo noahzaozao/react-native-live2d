@@ -105,4 +105,16 @@ export interface Live2DModule {
    * @param expressionId 表情 ID
    */
   setExpression(expressionId: string): Promise<boolean>;
+  
+  /**
+   * 设置口型同步值（用于实时口型同步）
+   * @param value 嘴巴开合度（0.0 ~ 1.0）
+   */
+  setMouthValue(value: number): void;
+  
+  /**
+   * 获取当前口型同步值
+   * @returns 当前嘴巴开合度（0.0 ~ 1.0）
+   */
+  getMouthValue(): number;
 }
