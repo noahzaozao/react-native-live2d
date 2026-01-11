@@ -16,6 +16,7 @@ function ReactNativeLive2dView(props: ReactNativeLive2DViewProps) {
     onTap,
     onModelLoaded,
     onError,
+    onTouchEnd,
     style,
     ...otherProps
   } = props;
@@ -40,8 +41,11 @@ function ReactNativeLive2dView(props: ReactNativeLive2DViewProps) {
   // 使用 useCallback 稳定事件处理函数的引用
   const handleTap = useCallback(() => {
     console.log('[ReactNativeLive2dView] Tap event triggered');
+    // Android 原生 View 事件名为 onTap，这里统一走 onTap。
     onTap?.();
-  }, [onTap]);
+    // 兼容：历史上曾使用 onTouchEnd 作为点击回调名
+    onTouchEnd?.();
+  }, [onTap, onTouchEnd]);
 
   const handleModelLoaded = useCallback(() => {
     console.log('[ReactNativeLive2dView] Model loaded event received');
@@ -70,7 +74,7 @@ function ReactNativeLive2dView(props: ReactNativeLive2DViewProps) {
       autoBlink={autoBlink}
       scale={scale}
       position={position}
-      onTouchEnd={handleTap}
+      onTap={handleTap}
       onModelLoaded={handleModelLoaded}
       onError={handleError}
       style={combinedStyle}

@@ -64,6 +64,32 @@ class LAppModel : CubismUserModel() {
      */
     @Volatile
     private var externalMouthValue: Float = 0.0f
+
+    /**
+     * 是否启用自动眨眼（默认启用）
+     *
+     * 说明：
+     * - update() 每帧会先 model.loadParameters()，因此禁用时只需跳过 eyeBlink.updateParameters()
+     *   即可恢复到模型默认/动作驱动的眼部状态，不会“永久残留”上一次眨眼的偏移。
+     */
+    @Volatile
+    private var autoBlinkEnabled: Boolean = true
+
+    /**
+     * 是否启用自动呼吸（默认启用）
+     *
+     * 说明同上：禁用时跳过 breath.updateParameters() 即可移除呼吸叠加。
+     */
+    @Volatile
+    private var autoBreathEnabled: Boolean = true
+
+    fun setAutoBlink(enabled: Boolean) {
+        autoBlinkEnabled = enabled
+    }
+
+    fun setAutoBreath(enabled: Boolean) {
+        autoBreathEnabled = enabled
+    }
     
     /**
      * 読み込まれているモーションのマップ
@@ -473,10 +499,12 @@ class LAppModel : CubismUserModel() {
         }
 
         // まばたき
-        eyeBlink?.let {
-            // メインモーションの更新がないとき
-            if (!motionUpdated) {
-                it.updateParameters(model, deltaTimeSeconds) // 目パチ
+        if (autoBlinkEnabled) {
+            eyeBlink?.let {
+                // メインモーションの更新がないとき
+                if (!motionUpdated) {
+                    it.updateParameters(model, deltaTimeSeconds) // 目パチ
+                }
             }
         }
 
@@ -498,8 +526,10 @@ class LAppModel : CubismUserModel() {
         model?.addParameterValue(idParamEyeBallY, dragY * DRAG_EYE_BALL_MULTIPLIER)
 
         // 呼吸など
-        breath?.let {
-            it.updateParameters(model, deltaTimeSeconds)
+        if (autoBreathEnabled) {
+            breath?.let {
+                it.updateParameters(model, deltaTimeSeconds)
+            }
         }
 
         // 物理演算の設定

@@ -50,6 +50,8 @@ export interface ReactNativeLive2DViewProps {
 
   /**
    * 触摸结束事件
+   *
+   * @deprecated Android 原生事件名为 `onTap`；此字段仅为历史兼容，建议使用 `onTap`。
    */
   onTouchEnd?: () => void;
   

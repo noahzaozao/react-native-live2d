@@ -118,6 +118,23 @@ class ReactNativeLive2dModule : Module() {
             }
         }
 
+        /**
+         * 显式初始化 Live2D 框架（供 JS 调用）
+         *
+         * 说明：
+         * - `ReactNativeLive2dView` 通常会在 GL 线程里调用 delegate.onStart() 做初始化
+         * - 但 JS 侧有时需要提前/显式确保框架已就绪（例如页面首次进入、或某些竞态场景）
+         */
+        AsyncFunction("initializeLive2D") { promise: Promise ->
+            try {
+                val ok = ensureLive2DInitialized()
+                promise.resolve(ok)
+            } catch (e: Exception) {
+                Log.e(TAG, "initializeLive2D failed: ${e.message}", e)
+                promise.resolve(false)
+            }
+        }
+
         AsyncFunction("getAvailableModels") { promise: Promise ->
             try {
                 Log.d(TAG, "Getting available models")

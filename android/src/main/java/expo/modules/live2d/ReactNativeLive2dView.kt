@@ -416,8 +416,8 @@ class ReactNativeLive2dView(context: Context, appContext: AppContext) :
                 // 应用 autoBlink（直接设置到模型）
                 currentAutoBlink?.let { enabled ->
                     try {
-                        // TODO: LAppModel 需要添加 autoBlink 支持
-                        Log.d(TAG, "Cached autoBlink: $enabled (not yet applied)")
+                        model.setAutoBlink(enabled)
+                        Log.d(TAG, "Applied cached autoBlink: $enabled")
                     } catch (e: Exception) {
                         Log.w(TAG, "apply cached autoBlink failed: ${e.message}")
                     }
@@ -426,8 +426,8 @@ class ReactNativeLive2dView(context: Context, appContext: AppContext) :
                 // 应用 autoBreath（直接设置到模型）
                 currentAutoBreath?.let { enabled ->
                     try {
-                        // TODO: LAppModel 需要添加 autoBreath 支持
-                        Log.d(TAG, "Cached autoBreath: $enabled (not yet applied)")
+                        model.setAutoBreath(enabled)
+                        Log.d(TAG, "Applied cached autoBreath: $enabled")
                     } catch (e: Exception) {
                         Log.w(TAG, "apply cached autoBreath failed: ${e.message}")
                     }
@@ -713,14 +713,22 @@ class ReactNativeLive2dView(context: Context, appContext: AppContext) :
 
         currentAutoBlink = enabled
 
-        var currentModel = live2dManager?.getModel(0)
+        val currentModel = live2dManager?.getModel(0)
         if (currentModel == null) {
             Log.w(TAG, "setAutoBlink currentModel is null")
             return
         }
 
         try {
-            Log.d(TAG, "TODO: Auto blink setting: $enabled")
+            // 在 GL 线程修改模型开关，避免与 update() 并发
+            glSurfaceView.queueEvent {
+                try {
+                    currentModel.setAutoBlink(enabled)
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to apply autoBlink on GL thread: ${e.message}")
+                }
+            }
+            glSurfaceView.requestRender()
         } catch (e: Exception) {
             Log.e(TAG, "Failed to set auto blink: ${e.message}")
         }
@@ -731,14 +739,22 @@ class ReactNativeLive2dView(context: Context, appContext: AppContext) :
 
         currentAutoBreath = enabled
 
-        var currentModel = live2dManager?.getModel(0)
+        val currentModel = live2dManager?.getModel(0)
         if (currentModel == null) {
             Log.w(TAG, "setAutoBreath currentModel is null")
             return
         }
 
         try {
-            Log.d(TAG, "TODO: Auto breath setting: $enabled")
+            // 在 GL 线程修改模型开关，避免与 update() 并发
+            glSurfaceView.queueEvent {
+                try {
+                    currentModel.setAutoBreath(enabled)
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to apply autoBreath on GL thread: ${e.message}")
+                }
+            }
+            glSurfaceView.requestRender()
         } catch (e: Exception) {
             Log.e(TAG, "Failed to set auto breath: ${e.message}")
         }
