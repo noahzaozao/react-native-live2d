@@ -362,7 +362,7 @@ class ReactNativeLive2dView(context: Context, appContext: AppContext) :
 
         model.loadAssetsFromFileSystem(actualPath)
 
-        // 检查模型是否成功加载
+        // 先验证新模型，成功后再释放旧模型，避免加载失败时视图变空
         if (model.model == null) {
             Log.e(TAG, "loadModelFromFileSystem: model is null")
             dispatchEvent(
@@ -376,6 +376,10 @@ class ReactNativeLive2dView(context: Context, appContext: AppContext) :
         }
 
         Log.d(TAG, "loadModelFromFileSystem: after model.loadAssetsFromFileSystem: $actualPath")
+
+        // 新模型验证通过，释放旧模型后再添加（GL 线程安全）
+        manager.releaseAllModel()
+        Log.d(TAG, "loadModelFromFileSystem: released all existing models")
 
         // 将模型添加到管理器
         manager.addModel(model)
