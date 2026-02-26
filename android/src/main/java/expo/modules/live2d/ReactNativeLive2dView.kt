@@ -356,6 +356,11 @@ class ReactNativeLive2dView(context: Context, appContext: AppContext) :
 
         Log.d(TAG, "loadModelFromFileSystem: before LAppModel")
 
+        // 在加载新模型前，先释放旧模型（GL 线程安全）
+        // 注：dedup 检查已在 loadModel() 入口处处理同路径重复加载，此处不会误清理
+        manager.releaseAllModel()
+        Log.d(TAG, "loadModelFromFileSystem: released all existing models")
+
         val model = LAppModel()
 
         Log.d(TAG, "loadModelFromFileSystem: before model.loadAssetsFromFileSystem: $actualPath")
