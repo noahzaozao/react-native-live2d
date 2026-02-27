@@ -90,7 +90,7 @@ object LAppDefine {
         /**
          * Background image file
          */
-        BACK_IMAGE("back_class_normal.png"),
+        BACK_IMAGE("model_manager_background.png"),
         /**
          * Gear image file
          */

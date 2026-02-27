@@ -32,11 +32,16 @@ class ReactNativeLive2dView(context: Context, appContext: AppContext) :
     
     companion object {
         private const val TAG = "ReactNativeLive2dView"
-        
+
         // 队列管理常量
         private const val MAX_MOTION_QUEUE_SIZE = 3  // 最大动作队列长度
         private const val MAX_EXPRESSION_QUEUE_SIZE = 2  // 最大表情队列长度
         private const val TEXTURE_BIND_RETRY_DELAY_MS = 50L  // 纹理绑定重试延迟
+
+        // 当前活跃的 View 实例（弱引用，避免内存泄漏）
+        private var currentInstance: java.lang.ref.WeakReference<ReactNativeLive2dView>? = null
+
+        fun getCurrentInstance(): ReactNativeLive2dView? = currentInstance?.get()
     }
 
     // Event dispatchers for each event type
@@ -914,6 +919,8 @@ class ReactNativeLive2dView(context: Context, appContext: AppContext) :
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
 
+        currentInstance = java.lang.ref.WeakReference(this)
+
         Log.d(TAG, "onAttachedToWindow: View attached to window")
 
         // 恢复 GLSurfaceView 渲染
@@ -940,6 +947,8 @@ class ReactNativeLive2dView(context: Context, appContext: AppContext) :
 
     override fun onDetachedFromWindow() {
         super.onDetachedFromWindow()
+
+        if (currentInstance?.get() === this) currentInstance = null
 
         Log.d(TAG, "onDetachedFromWindow")
 

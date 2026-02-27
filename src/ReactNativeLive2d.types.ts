@@ -113,6 +113,11 @@ export interface Live2DModule {
    * @param value 嘴巴开合度（0.0 ~ 1.0）
    */
   setMouthValue(value: number): void;
+
+  /**
+   * 直接设置模型位置（绕过 React prop 链路，用于拖动等高频场景）
+   */
+  setViewPosition(x: number, y: number): void;
   
   /**
    * 获取当前口型同步值
