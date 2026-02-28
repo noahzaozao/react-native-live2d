@@ -5,6 +5,7 @@
 # VSCode
 .vscode/
 jsconfig.json
+*.code-workspace
 
 # Xcode
 #
