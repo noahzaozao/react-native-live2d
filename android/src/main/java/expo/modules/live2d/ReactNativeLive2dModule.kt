@@ -365,6 +365,11 @@ class ReactNativeLive2dModule : Module() {
          * 用于高频调用场景（如双指缩放）
          */
         Function("setViewScale") { scale: Float ->
+            // Validate scale: must be finite, positive, and non-zero
+            if (scale.isNaN() || scale.isInfinite() || scale <= 0) {
+                Log.w(TAG, "setViewScale: invalid scale value $scale (must be finite, positive, non-zero)")
+                return@Function
+            }
             try {
                 val view = ReactNativeLive2dView.getCurrentInstance()
                 if (view != null) {
