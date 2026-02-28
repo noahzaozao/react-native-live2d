@@ -32,11 +32,45 @@ class ReactNativeLive2dView(context: Context, appContext: AppContext) :
     
     companion object {
         private const val TAG = "ReactNativeLive2dView"
-        
+
         // 队列管理常量
         private const val MAX_MOTION_QUEUE_SIZE = 3  // 最大动作队列长度
         private const val MAX_EXPRESSION_QUEUE_SIZE = 2  // 最大表情队列长度
         private const val TEXTURE_BIND_RETRY_DELAY_MS = 50L  // 纹理绑定重试延迟
+
+        // 当前活跃的 View 实例（弱引用，避免内存泄漏）
+        // 使用 AtomicReference 确保多线程安全（Module 函数在 JS 线程调用，View 生命周期在 UI 线程）
+        private val currentInstanceRef = java.util.concurrent.atomic.AtomicReference<java.lang.ref.WeakReference<ReactNativeLive2dView>?>(null)
+
+        /**
+         * 获取当前活跃的 Live2D View 实例
+         *
+         * 线程安全说明：
+         * - 使用 AtomicReference 确保跨线程原子访问
+         * - 返回的 view 实例操作应在对应线程进行（GL 操作需 queueEvent）
+         *
+         * 注意：在多实例场景下，返回的是最后 attached 的 view
+         */
+        fun getCurrentInstance(): ReactNativeLive2dView? = currentInstanceRef.get()?.get()
+
+        /**
+         * 设置当前活跃的 View 实例（内部使用）
+         */
+        internal fun setCurrentInstance(view: ReactNativeLive2dView?) {
+            currentInstanceRef.set(if (view != null) java.lang.ref.WeakReference(view) else null)
+        }
+
+        /**
+         * 清除当前实例（仅当传入的 view 是当前实例时才清除）
+         */
+        internal fun clearCurrentInstance(view: ReactNativeLive2dView) {
+            val expected = currentInstanceRef.get()
+            expected?.get()?.let { current ->
+                if (current === view) {
+                    currentInstanceRef.compareAndSet(expected, null)
+                }
+            }
+        }
     }
 
     // Event dispatchers for each event type
@@ -914,6 +948,8 @@ class ReactNativeLive2dView(context: Context, appContext: AppContext) :
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
 
+        setCurrentInstance(this)
+
         Log.d(TAG, "onAttachedToWindow: View attached to window")
 
         // 恢复 GLSurfaceView 渲染
@@ -940,6 +976,8 @@ class ReactNativeLive2dView(context: Context, appContext: AppContext) :
 
     override fun onDetachedFromWindow() {
         super.onDetachedFromWindow()
+
+        clearCurrentInstance(this)
 
         Log.d(TAG, "onDetachedFromWindow")
 

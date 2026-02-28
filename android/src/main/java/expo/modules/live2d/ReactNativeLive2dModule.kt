@@ -335,11 +335,28 @@ class ReactNativeLive2dModule : Module() {
             try {
                 val manager = LAppLive2DManager.getInstance()
                 val currentModel = manager.getModel(0)
-                
+
                 currentModel?.getMouthValue() ?: 0.0f
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to get mouth value: ${e.message}")
                 0.0f
+            }
+        }
+
+        /**
+         * 直接设置模型位置（绕过 React prop 链路，避免触发重渲染）
+         * 与 setMouthValue 同理，用于高频调用场景（如拖动）
+         */
+        Function("setViewPosition") { x: Float, y: Float ->
+            try {
+                val view = ReactNativeLive2dView.getCurrentInstance()
+                if (view != null) {
+                    view.setPosition(x, y)
+                } else {
+                    Log.w(TAG, "setViewPosition: no active ReactNativeLive2dView instance")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to setViewPosition: ${e.message}")
             }
         }
     }
