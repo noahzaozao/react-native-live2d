@@ -64,9 +64,10 @@ class ReactNativeLive2dView(context: Context, appContext: AppContext) :
          * 清除当前实例（仅当传入的 view 是当前实例时才清除）
          */
         internal fun clearCurrentInstance(view: ReactNativeLive2dView) {
-            currentInstanceRef.get()?.get()?.let { current ->
+            val expected = currentInstanceRef.get()
+            expected?.get()?.let { current ->
                 if (current === view) {
-                    currentInstanceRef.compareAndSet(currentInstanceRef.get(), null)
+                    currentInstanceRef.compareAndSet(expected, null)
                 }
             }
         }
