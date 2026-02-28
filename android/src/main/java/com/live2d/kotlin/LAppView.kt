@@ -367,7 +367,6 @@ class LAppView : AutoCloseable {
         val viewY = transformViewY(touchManager.getLastY())
 
         touchManager.touchesMoved(pointX, pointY)
-
         LAppLive2DManager.getInstance().onDrag(viewX, viewY)
     }
 

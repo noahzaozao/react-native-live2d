@@ -839,10 +839,10 @@ class ReactNativeLive2dView(context: Context, appContext: AppContext) :
 
     /**
      * Set the model's position offset
-     * 
+     *
      * @param x X offset in logical coordinates (center is 0, right is positive)
      * @param y Y offset in logical coordinates (center is 0, up is positive)
-     * 
+     *
      * Thread safety: GL operations are queued automatically
      */
     fun setPosition(x: Float, y: Float) {

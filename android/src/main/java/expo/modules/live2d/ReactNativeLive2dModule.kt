@@ -359,5 +359,23 @@ class ReactNativeLive2dModule : Module() {
                 Log.e(TAG, "Failed to setViewPosition: ${e.message}")
             }
         }
+
+        /**
+         * 直接设置模型缩放（绕过 React prop 链路，避免触发重渲染）
+         * 用于高频调用场景（如双指缩放）
+         */
+        Function("setViewScale") { scale: Float ->
+            try {
+                val view = ReactNativeLive2dView.getCurrentInstance()
+                if (view != null) {
+                    view.setScale(scale)
+                } else {
+                    Log.w(TAG, "setViewScale: no active ReactNativeLive2dView instance")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to setViewScale: ${e.message}")
+            }
+        }
+
     }
 }

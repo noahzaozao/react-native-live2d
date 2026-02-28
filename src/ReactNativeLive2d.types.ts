@@ -118,10 +118,16 @@ export interface Live2DModule {
    * 直接设置模型位置（绕过 React prop 链路，用于拖动等高频场景）
    */
   setViewPosition(x: number, y: number): void;
-  
+
+  /**
+   * 直接设置模型缩放（绕过 React prop 链路，用于缩放等高频场景）
+   */
+  setViewScale(scale: number): void;
+
   /**
    * 获取当前口型同步值
    * @returns 当前嘴巴开合度（0.0 ~ 1.0）
    */
   getMouthValue(): number;
+
 }
