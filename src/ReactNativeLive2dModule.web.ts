@@ -35,6 +35,9 @@ const ReactNativeLive2dModule: Live2DModule = {
   },
   getMouthValue() {
     return 0;
+  },
+  setViewPosition(_x: number, _y: number) {
+    // no-op: web 端不支持直接设置视图位置
   }
 };
 
