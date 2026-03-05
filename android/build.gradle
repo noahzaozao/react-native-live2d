@@ -62,5 +62,7 @@ repositories {
 }
 
 dependencies {
-  implementation fileTree(dir: "libs", include: ["*.aar", "*.jar"])
+  // Use compileOnly so the classes are available during compilation,
+  // but the actual AAR files are provided by the app module at runtime
+  compileOnly fileTree(dir: "libs", include: ["*.aar", "*.jar"])
 }
