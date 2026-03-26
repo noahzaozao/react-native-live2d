@@ -38,10 +38,12 @@ const ReactNativeLive2dModule: Live2DModule = {
   },
   setViewPosition(_x: number, _y: number) {
     // no-op: web 端不支持直接设置视图位置
+  },
+  setViewScale(_scale: number) {
+    // no-op: web 端不支持直接设置视图缩放
   }
 };
 
 export default ReactNativeLive2dModule;
 export { ReactNativeLive2dModule };
-
 
